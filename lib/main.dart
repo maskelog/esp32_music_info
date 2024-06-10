@@ -24,6 +24,7 @@ class MyAppState extends State<MyApp> {
   BluetoothCharacteristic? targetCharacteristic;
 
   String musicInfo = "Waiting for music...";
+  String errorMessage = "";
 
   @override
   void initState() {
@@ -43,17 +44,30 @@ class MyAppState extends State<MyApp> {
       _showMessage("All permissions granted");
     } else {
       _showMessage("Permissions not granted");
+      setState(() {
+        errorMessage = "Permissions not granted";
+      });
     }
   }
 
   void startScanning() {
     devicesList.clear();
+    setState(() {
+      errorMessage = "Starting scan...";
+    });
     flutterBlue.startScan(
       timeout: const Duration(seconds: 10),
       // 필터 추가 - 특정 서비스 UUID로 필터링
       withServices: [Guid("3db02924-b2a6-4d47-be1f-0f90ad62a048")],
     ).then((_) {
-      setState(() {}); // 스캔 완료 후 UI 업데이트
+      setState(() {
+        errorMessage = "Scan completed";
+      }); // 스캔 완료 후 UI 업데이트
+    }).catchError((e) {
+      _showMessage("Error starting scan: $e");
+      setState(() {
+        errorMessage = "Error starting scan: $e";
+      });
     });
 
     flutterBlue.scanResults.listen((results) {
@@ -65,6 +79,16 @@ class MyAppState extends State<MyApp> {
           });
         }
       }
+      if (results.isEmpty) {
+        setState(() {
+          errorMessage = "No devices found";
+        });
+      }
+    }).onError((error) {
+      _showMessage("Error during scan: $error");
+      setState(() {
+        errorMessage = "Error during scan: $error";
+      });
     });
   }
 
@@ -75,6 +99,9 @@ class MyAppState extends State<MyApp> {
       discoverServices();
     } catch (e) {
       _showMessage("Error connecting to device: $e");
+      setState(() {
+        errorMessage = "Error connecting to device: $e";
+      });
     }
   }
 
@@ -99,6 +126,9 @@ class MyAppState extends State<MyApp> {
       }
     } catch (e) {
       _showMessage("Error discovering services: $e");
+      setState(() {
+        errorMessage = "Error discovering services: $e";
+      });
     }
   }
 
@@ -111,6 +141,9 @@ class MyAppState extends State<MyApp> {
       sendMusicInfo(result);
     } catch (e) {
       _showMessage("Error getting music info: $e");
+      setState(() {
+        errorMessage = "Error getting music info: $e";
+      });
     }
   }
 
@@ -122,6 +155,9 @@ class MyAppState extends State<MyApp> {
       await targetCharacteristic!.write(bytes);
     } catch (e) {
       _showMessage("Error sending music info: $e");
+      setState(() {
+        errorMessage = "Error sending music info: $e";
+      });
     }
   }
 
@@ -154,6 +190,11 @@ class MyAppState extends State<MyApp> {
             ),
           ),
           Text(musicInfo),
+          if (errorMessage.isNotEmpty)
+            Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.red),
+            ),
         ],
       ),
     );
