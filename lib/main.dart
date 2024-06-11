@@ -1,200 +1,451 @@
-import 'dart:convert';
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue/flutter_blue.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {
-  runApp(const MaterialApp(home: MyApp()));
+  runApp(const FlutterBlueApp());
 }
 
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
+class FlutterBlueApp extends StatelessWidget {
+  const FlutterBlueApp({super.key});
 
   @override
-  MyAppState createState() => MyAppState();
-}
-
-class MyAppState extends State<MyApp> {
-  static const platform =
-      MethodChannel('com.example.ble_music_info/music_info');
-  FlutterBlue flutterBlue = FlutterBlue.instance;
-  List<BluetoothDevice> devicesList = [];
-  BluetoothDevice? targetDevice;
-  BluetoothCharacteristic? targetCharacteristic;
-
-  String musicInfo = "Waiting for music...";
-  String errorMessage = "";
-
-  @override
-  void initState() {
-    super.initState();
-    requestPermissions();
-  }
-
-  Future<void> requestPermissions() async {
-    var statuses = await [
-      Permission.bluetooth,
-      Permission.bluetoothConnect,
-      Permission.bluetoothScan,
-      Permission.location, // 위치 권한 추가
-    ].request();
-
-    if (statuses.values.every((status) => status.isGranted)) {
-      _showMessage("All permissions granted");
-    } else {
-      _showMessage("Permissions not granted");
-      setState(() {
-        errorMessage = "Permissions not granted";
-      });
-    }
-  }
-
-  void startScanning() {
-    devicesList.clear();
-    setState(() {
-      errorMessage = "Starting scan...";
-    });
-    flutterBlue.startScan(
-      timeout: const Duration(seconds: 10),
-      // 필터 추가 - 특정 서비스 UUID로 필터링
-      withServices: [Guid("3db02924-b2a6-4d47-be1f-0f90ad62a048")],
-    ).then((_) {
-      setState(() {
-        errorMessage = "Scan completed";
-      }); // 스캔 완료 후 UI 업데이트
-    }).catchError((e) {
-      _showMessage("Error starting scan: $e");
-      setState(() {
-        errorMessage = "Error starting scan: $e";
-      });
-    });
-
-    flutterBlue.scanResults.listen((results) {
-      for (ScanResult r in results) {
-        print('Found device: ${r.device.name}, ${r.device.id}');
-        if (!devicesList.contains(r.device)) {
-          setState(() {
-            devicesList.add(r.device);
-          });
-        }
-      }
-      if (results.isEmpty) {
-        setState(() {
-          errorMessage = "No devices found";
-        });
-      }
-    }).onError((error) {
-      _showMessage("Error during scan: $error");
-      setState(() {
-        errorMessage = "Error during scan: $error";
-      });
-    });
-  }
-
-  Future<void> connectToDevice(BluetoothDevice device) async {
-    targetDevice = device;
-    try {
-      await targetDevice!.connect(autoConnect: false);
-      discoverServices();
-    } catch (e) {
-      _showMessage("Error connecting to device: $e");
-      setState(() {
-        errorMessage = "Error connecting to device: $e";
-      });
-    }
-  }
-
-  Future<void> discoverServices() async {
-    if (targetDevice == null) return;
-
-    try {
-      List<BluetoothService> services = await targetDevice!.discoverServices();
-      for (var service in services) {
-        if (service.uuid.toString() == "3db02924-b2a6-4d47-be1f-0f90ad62a048") {
-          for (var characteristic in service.characteristics) {
-            if (characteristic.uuid.toString() ==
-                "8d8218b6-97bc-4527-a8db-13094ac06b1d") {
-              setState(() {
-                targetCharacteristic = characteristic;
-              });
-              getMusicInfo();
-              return;
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      color: Colors.lightBlue,
+      home: StreamBuilder<BluetoothState>(
+          stream: FlutterBlue.instance.state,
+          initialData: BluetoothState.unknown,
+          builder: (c, snapshot) {
+            final state = snapshot.data;
+            if (state == BluetoothState.on) {
+              return const FindDevicesScreen();
             }
+            return BluetoothOffScreen(state: state);
+          }),
+    );
+  }
+}
+
+class BluetoothOffScreen extends StatelessWidget {
+  const BluetoothOffScreen({super.key, this.state});
+
+  final BluetoothState? state;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.lightBlue,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const Icon(
+              Icons.bluetooth_disabled,
+              size: 200.0,
+              color: Colors.white54,
+            ),
+            Text(
+              'Bluetooth Adapter is ${state != null ? state.toString().substring(15) : 'not available'}.',
+              style: Theme.of(context)
+                  .primaryTextTheme
+                  .titleMedium
+                  ?.copyWith(color: Colors.white),
+            ),
+            ElevatedButton(
+              child: const Text('Request Permissions'),
+              onPressed: () async {
+                await [
+                  Permission.bluetooth,
+                  Permission.bluetoothConnect,
+                  Permission.bluetoothScan,
+                  Permission.location,
+                ].request();
+
+                final status = await FlutterBlue.instance.state.first;
+                if (status == BluetoothState.on) {
+                  Navigator.of(context).pushReplacement(MaterialPageRoute(
+                      builder: (context) => const FindDevicesScreen()));
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("Bluetooth is not enabled"),
+                  ));
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FindDevicesScreen extends StatelessWidget {
+  const FindDevicesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Find Devices'),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => FlutterBlue.instance
+            .startScan(timeout: const Duration(seconds: 4))
+            .catchError((e) {
+          print("Error starting scan: $e");
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text("Error starting scan: $e"),
+          ));
+        }),
+        child: SingleChildScrollView(
+          child: Column(
+            children: <Widget>[
+              StreamBuilder<List<BluetoothDevice>>(
+                stream: Stream.periodic(const Duration(seconds: 2))
+                    .asyncMap((_) => FlutterBlue.instance.connectedDevices),
+                initialData: const [],
+                builder: (c, snapshot) => Column(
+                  children: snapshot.data!
+                      .map((d) => ListTile(
+                            title: Text(d.name),
+                            subtitle: Text(d.id.toString()),
+                            trailing: StreamBuilder<BluetoothDeviceState>(
+                              stream: d.state,
+                              initialData: BluetoothDeviceState.disconnected,
+                              builder: (c, snapshot) {
+                                if (snapshot.data ==
+                                    BluetoothDeviceState.connected) {
+                                  return ElevatedButton(
+                                    child: const Text('OPEN'),
+                                    onPressed: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                DeviceScreen(device: d))),
+                                  );
+                                }
+                                return Text(snapshot.data.toString());
+                              },
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+              StreamBuilder<List<ScanResult>>(
+                stream: FlutterBlue.instance.scanResults,
+                initialData: const [],
+                builder: (c, snapshot) => Column(
+                  children: snapshot.data!
+                      .map(
+                        (r) => ScanResultTile(
+                          result: r,
+                          onTap: () => Navigator.of(context)
+                              .push(MaterialPageRoute(builder: (context) {
+                            r.device.connect();
+                            return DeviceScreen(device: r.device);
+                          })),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: StreamBuilder<bool>(
+        stream: FlutterBlue.instance.isScanning,
+        initialData: false,
+        builder: (c, snapshot) {
+          if (snapshot.data!) {
+            return FloatingActionButton(
+              onPressed: () => FlutterBlue.instance.stopScan(),
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.stop),
+            );
+          } else {
+            return FloatingActionButton(
+                child: const Icon(Icons.search),
+                onPressed: () => FlutterBlue.instance
+                        .startScan(timeout: const Duration(seconds: 4))
+                        .catchError((e) {
+                      print("Error starting scan: $e");
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text("Error starting scan: $e"),
+                      ));
+                    }));
           }
-        }
-      }
-    } catch (e) {
-      _showMessage("Error discovering services: $e");
-      setState(() {
-        errorMessage = "Error discovering services: $e";
-      });
-    }
+        },
+      ),
+    );
+  }
+}
+
+class DeviceScreen extends StatelessWidget {
+  const DeviceScreen({super.key, required this.device});
+
+  final BluetoothDevice device;
+
+  List<int> _getRandomBytes() {
+    final math = Random();
+    return [
+      math.nextInt(255),
+      math.nextInt(255),
+      math.nextInt(255),
+      math.nextInt(255)
+    ];
   }
 
-  Future<void> getMusicInfo() async {
-    try {
-      final String result = await platform.invokeMethod('getMusicInfo');
-      setState(() {
-        musicInfo = result;
-      });
-      sendMusicInfo(result);
-    } catch (e) {
-      _showMessage("Error getting music info: $e");
-      setState(() {
-        errorMessage = "Error getting music info: $e";
-      });
-    }
-  }
-
-  Future<void> sendMusicInfo(String musicInfo) async {
-    if (targetCharacteristic == null) return;
-
-    try {
-      List<int> bytes = utf8.encode(musicInfo);
-      await targetCharacteristic!.write(bytes);
-    } catch (e) {
-      _showMessage("Error sending music info: $e");
-      setState(() {
-        errorMessage = "Error sending music info: $e";
-      });
-    }
-  }
-
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+  List<Widget> _buildServiceTiles(List<BluetoothService> services) {
+    return services
+        .map(
+          (s) => ServiceTile(
+            service: s,
+            characteristicTiles: s.characteristics
+                .map(
+                  (c) => CharacteristicTile(
+                    characteristic: c,
+                    onReadPressed: () => c.read(),
+                    onWritePressed: () async {
+                      await c.write(_getRandomBytes(), withoutResponse: true);
+                      await c.read();
+                    },
+                    onNotificationPressed: () async {
+                      await c.setNotifyValue(!c.isNotifying);
+                      await c.read();
+                    },
+                    descriptorTiles: c.descriptors
+                        .map(
+                          (d) => DescriptorTile(
+                            descriptor: d,
+                            onReadPressed: () => d.read(),
+                            onWritePressed: () => d.write(_getRandomBytes()),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                )
+                .toList(),
+          ),
+        )
+        .toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("BLE Music Info")),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          ElevatedButton(
-            onPressed: startScanning,
-            child: const Text('Scan for Devices'),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: devicesList.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(devicesList[index].name),
-                  subtitle: Text(devicesList[index].id.toString()),
-                  onTap: () => connectToDevice(devicesList[index]),
+      appBar: AppBar(
+        title: Text(device.name),
+        actions: <Widget>[
+          StreamBuilder<BluetoothDeviceState>(
+            stream: device.state,
+            initialData: BluetoothDeviceState.connecting,
+            builder: (c, snapshot) {
+              VoidCallback? onPressed;
+              String text;
+              switch (snapshot.data) {
+                case BluetoothDeviceState.connected:
+                  onPressed = () => device.disconnect();
+                  text = 'DISCONNECT';
+                  break;
+                case BluetoothDeviceState.disconnected:
+                  onPressed = () => device.connect();
+                  text = 'CONNECT';
+                  break;
+                default:
+                  onPressed = null;
+                  text = snapshot.data.toString().substring(21).toUpperCase();
+                  break;
+              }
+              return TextButton(
+                  onPressed: onPressed,
+                  child: Text(
+                    text,
+                    style: Theme.of(context)
+                        .primaryTextTheme
+                        .labelLarge
+                        ?.copyWith(color: Colors.white),
+                  ));
+            },
+          )
+        ],
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: <Widget>[
+            StreamBuilder<BluetoothDeviceState>(
+              stream: device.state,
+              initialData: BluetoothDeviceState.connecting,
+              builder: (c, snapshot) => ListTile(
+                leading: (snapshot.data == BluetoothDeviceState.connected)
+                    ? const Icon(Icons.bluetooth_connected)
+                    : const Icon(Icons.bluetooth_disabled),
+                title: Text(
+                    'Device is ${snapshot.data.toString().split('.')[1]}.'),
+                subtitle: Text('${device.id}'),
+                trailing: StreamBuilder<bool>(
+                  stream: device.isDiscoveringServices,
+                  initialData: false,
+                  builder: (c, snapshot) => IndexedStack(
+                    index: snapshot.data! ? 1 : 0,
+                    children: <Widget>[
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () => device.discoverServices(),
+                      ),
+                      const IconButton(
+                        icon: SizedBox(
+                          width: 18.0,
+                          height: 18.0,
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(Colors.grey),
+                          ),
+                        ),
+                        onPressed: null,
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            StreamBuilder<int>(
+              stream: device.mtu,
+              initialData: 0,
+              builder: (c, snapshot) => ListTile(
+                title: const Text('MTU Size'),
+                subtitle: Text('${snapshot.data} bytes'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => device.requestMtu(223),
+                ),
+              ),
+            ),
+            StreamBuilder<List<BluetoothService>>(
+              stream: device.services,
+              initialData: const [],
+              builder: (c, snapshot) {
+                return Column(
+                  children: _buildServiceTiles(snapshot.data!),
                 );
               },
             ),
-          ),
-          Text(musicInfo),
-          if (errorMessage.isNotEmpty)
-            Text(
-              errorMessage,
-              style: const TextStyle(color: Colors.red),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ScanResultTile extends StatelessWidget {
+  const ScanResultTile({super.key, required this.result, required this.onTap});
+
+  final ScanResult result;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text(
+          result.device.name.isEmpty ? "Unknown Device" : result.device.name),
+      subtitle: Text(result.device.id.toString()),
+      trailing: ElevatedButton(
+        onPressed: onTap,
+        child: const Text("CONNECT"),
+      ),
+    );
+  }
+}
+
+class ServiceTile extends StatelessWidget {
+  const ServiceTile(
+      {super.key, required this.service, required this.characteristicTiles});
+
+  final BluetoothService service;
+  final List<Widget> characteristicTiles;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text('Service ${service.uuid.toString()}'),
+      children: characteristicTiles,
+    );
+  }
+}
+
+class CharacteristicTile extends StatelessWidget {
+  const CharacteristicTile({
+    super.key,
+    required this.characteristic,
+    required this.onReadPressed,
+    required this.onWritePressed,
+    required this.onNotificationPressed,
+    required this.descriptorTiles,
+  });
+
+  final BluetoothCharacteristic characteristic;
+  final VoidCallback onReadPressed;
+  final VoidCallback onWritePressed;
+  final VoidCallback onNotificationPressed;
+  final List<Widget> descriptorTiles;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: ListTile(
+        title: Text('Characteristic ${characteristic.uuid.toString()}'),
+        subtitle: Text('Properties: ${characteristic.properties}'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.file_download),
+              onPressed: onReadPressed,
             ),
+            IconButton(
+              icon: const Icon(Icons.file_upload),
+              onPressed: onWritePressed,
+            ),
+            IconButton(
+              icon: const Icon(Icons.notifications),
+              onPressed: onNotificationPressed,
+            ),
+          ],
+        ),
+      ),
+      children: descriptorTiles,
+    );
+  }
+}
+
+class DescriptorTile extends StatelessWidget {
+  const DescriptorTile(
+      {super.key,
+      required this.descriptor,
+      required this.onReadPressed,
+      required this.onWritePressed});
+
+  final BluetoothDescriptor descriptor;
+  final VoidCallback onReadPressed;
+  final VoidCallback onWritePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: Text('Descriptor ${descriptor.uuid.toString()}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.file_download),
+            onPressed: onReadPressed,
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_upload),
+            onPressed: onWritePressed,
+          ),
         ],
       ),
     );
