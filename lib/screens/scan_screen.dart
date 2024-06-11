@@ -1,0 +1,216 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:music_info/screens/device_screen.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:async';
+import 'package:flutter/services.dart';
+
+class ScanScreen extends StatefulWidget {
+  const ScanScreen({super.key});
+
+  @override
+  ScanScreenState createState() => ScanScreenState();
+}
+
+class ScanScreenState extends State<ScanScreen> {
+  String _scanStatus = "Idle";
+  String _errorMessage = "";
+  static const platform =
+      MethodChannel('com.example.ble_music_info/music_info');
+
+  @override
+  void initState() {
+    super.initState();
+    requestPermissions();
+  }
+
+  Future<void> requestPermissions() async {
+    var status = await [
+      Permission.bluetooth,
+      Permission.bluetoothConnect,
+      Permission.bluetoothScan,
+      Permission.location,
+    ].request();
+
+    if (status[Permission.bluetooth]!.isGranted &&
+        status[Permission.bluetoothConnect]!.isGranted &&
+        status[Permission.bluetoothScan]!.isGranted &&
+        status[Permission.location]!.isGranted) {
+      startScan();
+    } else {
+      if (mounted) {
+        setState(() {
+          _errorMessage = "Permissions not granted";
+        });
+      }
+    }
+  }
+
+  void startScan() {
+    if (mounted) {
+      setState(() {
+        _scanStatus = "Scanning";
+        _errorMessage = "";
+      });
+    }
+
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 4)).then((_) {
+      if (mounted) {
+        setState(() {
+          _scanStatus = "Idle";
+        });
+      }
+    }).catchError((error) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = error.toString();
+          _scanStatus = "Idle";
+        });
+      }
+    });
+  }
+
+  void stopScan() {
+    FlutterBluePlus.stopScan();
+    if (mounted) {
+      setState(() {
+        _scanStatus = "Stopped";
+      });
+    }
+  }
+
+  Future<void> sendMusicInfo(BluetoothDevice device) async {
+    try {
+      final String result = await platform.invokeMethod('getMusicInfo');
+      List<BluetoothService> services = await device.discoverServices();
+      for (BluetoothService service in services) {
+        var targetServiceUUID = "3db02924-b2a6-4d47-be1f-0f90ad62a048";
+        if (service.uuid.toString() == targetServiceUUID) {
+          var targetCharacteristicUUID = "8d8218b6-97bc-4527-a8db-13094ac06b1d";
+          for (BluetoothCharacteristic characteristic
+              in service.characteristics) {
+            if (characteristic.uuid.toString() == targetCharacteristicUUID) {
+              await characteristic.write(result.codeUnits,
+                  withoutResponse: true);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> connectAndNavigate(BluetoothDevice device) async {
+    try {
+      await device.connect(); // Attempt to connect to the device
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => DeviceScreen(device: device),
+      )); // Navigate to DeviceScreen on successful connection
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage =
+              'Failed to connect: $e'; // Update the error message on failure
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Scan for Devices')),
+      body: RefreshIndicator(
+        onRefresh: () =>
+            FlutterBluePlus.startScan(timeout: const Duration(seconds: 4)),
+        child: SingleChildScrollView(
+          child: Column(
+            children: <Widget>[
+              if (_errorMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Error: $_errorMessage',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('Scan Status: $_scanStatus'),
+              ),
+              StreamBuilder<List<ScanResult>>(
+                stream: FlutterBluePlus.scanResults,
+                initialData: const [],
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.data!.isEmpty) {
+                    return const Center(child: Text("No devices found."));
+                  }
+                  return Column(
+                    children: snapshot.data!.map((r) {
+                      return ListTile(
+                        title: Text(r.device.name.isEmpty
+                            ? "Unknown Device"
+                            : r.device.name),
+                        subtitle: Text(r.device.id.toString()),
+                        trailing: ElevatedButton(
+                          onPressed: () async {
+                            try {
+                              await r.device.connect();
+                              await sendMusicInfo(r.device);
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        DeviceScreen(device: r.device),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                setState(() {
+                                  _errorMessage = e.toString();
+                                });
+                              }
+                            }
+                          },
+                          child: const Text("CONNECT"),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: StreamBuilder<bool>(
+        stream: FlutterBluePlus.isScanning,
+        initialData: false,
+        builder: (c, snapshot) {
+          if (snapshot.data!) {
+            return FloatingActionButton(
+              onPressed: stopScan,
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.stop),
+            );
+          } else {
+            return FloatingActionButton(
+              onPressed: startScan,
+              child: const Icon(Icons.search),
+            );
+          }
+        },
+      ),
+    );
+  }
+}

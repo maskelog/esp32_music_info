@@ -3,6 +3,7 @@ package com.example.music_info
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.os.Build
@@ -61,7 +62,7 @@ class MainActivity : FlutterActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_MEDIA_CONTROL) {
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 val musicInfo = getMusicInfo()
                 if (musicInfo != null) {
                     MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger
@@ -73,7 +74,7 @@ class MainActivity : FlutterActivity() {
         }
 
         if (requestCode == REQUEST_BLUETOOTH_PERMISSIONS) {
-            if ((grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Permissions granted, do something
             } else {
                 println("Bluetooth permissions denied")
@@ -85,13 +86,14 @@ class MainActivity : FlutterActivity() {
         val mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
         val controllers = mediaSessionManager.getActiveSessions(null)
 
-        if (controllers.isNotEmpty()) {
-            val controller = controllers[0]
-            val metadata = controller.metadata
-            if (metadata != null) {
-                val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
-                val artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-                return "$title - $artist"
+        for (controller in controllers) {
+            if ("com.google.android.apps.youtube.music" == controller.packageName) {
+                val metadata = controller.metadata
+                if (metadata != null) {
+                    val title = metadata.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
+                    val artist = metadata.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+                    return "$title - $artist"
+                }
             }
         }
         return null
