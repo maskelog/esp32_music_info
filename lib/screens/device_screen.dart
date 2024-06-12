@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:music_info/widgets/characteristic_tile.dart';
-import 'package:music_info/widgets/descriptor_tile.dart';
-import 'package:music_info/widgets/service_tile.dart';
 import 'package:music_info/utils/utils.dart';
 
 class DeviceScreen extends StatelessWidget {
-  const DeviceScreen({super.key, required this.device});
+  const DeviceScreen(
+      {super.key, required this.device, required this.musicInfo});
 
   final BluetoothDevice device;
+  final String musicInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +23,6 @@ class DeviceScreen extends StatelessWidget {
               initialData: BluetoothConnectionState.connecting,
               builder: (c, snapshot) {
                 if (snapshot.data == BluetoothConnectionState.connected) {
-                  // 자동으로 음악 정보를 전송
-                  BLEUtils.sendMusicInfo(device);
                   return const ListTile(
                     leading: Icon(Icons.bluetooth_connected),
                     title: Text('Connected'),
@@ -38,6 +35,10 @@ class DeviceScreen extends StatelessWidget {
                   subtitle: Text('Device is disconnected'),
                 );
               },
+            ),
+            ListTile(
+              title: const Text('Music Info'),
+              subtitle: Text(musicInfo),
             ),
             StreamBuilder<int>(
               stream: device.mtu,
@@ -85,8 +86,106 @@ class DeviceScreen extends StatelessWidget {
                 );
               },
             ),
+            ElevatedButton(
+              onPressed: () async {
+                await BLEUtils.sendMusicInfo(device);
+              },
+              child: const Text("Send Music Info"),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class ServiceTile extends StatelessWidget {
+  final BluetoothService service;
+  final List<CharacteristicTile> characteristicTiles;
+
+  const ServiceTile(
+      {super.key, required this.service, required this.characteristicTiles});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: Text(service.uuid.toString()),
+      children: characteristicTiles,
+    );
+  }
+}
+
+class CharacteristicTile extends StatelessWidget {
+  final BluetoothCharacteristic characteristic;
+  final VoidCallback? onReadPressed;
+  final VoidCallback? onWritePressed;
+  final VoidCallback? onNotificationPressed;
+  final List<DescriptorTile> descriptorTiles;
+
+  const CharacteristicTile({
+    super.key,
+    required this.characteristic,
+    this.onReadPressed,
+    this.onWritePressed,
+    this.onNotificationPressed,
+    required this.descriptorTiles,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ExpansionTile(
+      title: ListTile(
+        title: const Text('Characteristic'),
+        subtitle: Text(characteristic.uuid.toString()),
+      ),
+      children: <Widget>[
+        TextButton(
+          onPressed: onReadPressed,
+          child: const Text('Read'),
+        ),
+        TextButton(
+          onPressed: onWritePressed,
+          child: const Text('Write'),
+        ),
+        TextButton(
+          onPressed: onNotificationPressed,
+          child: const Text('Notify'),
+        ),
+        ...descriptorTiles,
+      ],
+    );
+  }
+}
+
+class DescriptorTile extends StatelessWidget {
+  final BluetoothDescriptor descriptor;
+  final VoidCallback? onReadPressed;
+  final VoidCallback? onWritePressed;
+
+  const DescriptorTile({
+    super.key,
+    required this.descriptor,
+    this.onReadPressed,
+    this.onWritePressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      title: const Text('Descriptor'),
+      subtitle: Text(descriptor.uuid.toString()),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          TextButton(
+            onPressed: onReadPressed,
+            child: const Text('Read'),
+          ),
+          TextButton(
+            onPressed: onWritePressed,
+            child: const Text('Write'),
+          ),
+        ],
       ),
     );
   }

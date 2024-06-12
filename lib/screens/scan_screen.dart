@@ -4,7 +4,7 @@ import 'package:music_info/screens/device_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
-import 'package:music_info/utils/utils.dart'; // Import the utils file
+import 'package:music_info/utils/utils.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -17,6 +17,7 @@ class ScanScreenState extends State<ScanScreen> {
   String _scanStatus = "Idle";
   String _errorMessage = "";
   BluetoothDevice? _connectedDevice;
+  String _musicInfo = "None";
 
   @override
   void initState() {
@@ -105,13 +106,13 @@ class ScanScreenState extends State<ScanScreen> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('lastConnectedDeviceId', device.id.id);
         _connectedDevice = device;
+        _musicInfo = await BLEUtils.getMusicInfo();
         if (mounted) {
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) => DeviceScreen(device: device),
+            builder: (context) =>
+                DeviceScreen(device: device, musicInfo: _musicInfo),
           ));
         }
-        await BLEUtils.sendMusicInfo(
-            device); // Automatically send music info after connecting
       } catch (e) {
         retryCount++;
         if (mounted) {
@@ -146,6 +147,10 @@ class ScanScreenState extends State<ScanScreen> {
             padding: const EdgeInsets.all(8.0),
             child:
                 Text('Connected Device: ${_connectedDevice?.name ?? 'None'}'),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('Music Info: $_musicInfo'),
           ),
           Expanded(
             child: StreamBuilder<List<ScanResult>>(
