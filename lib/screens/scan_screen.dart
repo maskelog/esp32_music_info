@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:music_info/screens/device_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import 'package:flutter/services.dart';
 
@@ -17,11 +18,28 @@ class ScanScreenState extends State<ScanScreen> {
   String _errorMessage = "";
   static const platform =
       MethodChannel('com.example.ble_music_info/music_info');
+  BluetoothDevice? _connectedDevice;
 
   @override
   void initState() {
     super.initState();
     requestPermissions();
+    _loadLastConnectedDevice();
+  }
+
+  Future<void> _loadLastConnectedDevice() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? deviceId = prefs.getString('lastConnectedDeviceId');
+    if (deviceId != null) {
+      List<BluetoothDevice> devices = FlutterBluePlus.connectedDevices;
+      for (BluetoothDevice device in devices) {
+        if (device.id.id == deviceId) {
+          _connectedDevice = device;
+          await connectAndNavigate(device);
+          break;
+        }
+      }
+    }
   }
 
   Future<void> requestPermissions() async {
@@ -90,8 +108,7 @@ class ScanScreenState extends State<ScanScreen> {
           for (BluetoothCharacteristic characteristic
               in service.characteristics) {
             if (characteristic.uuid.toString() == targetCharacteristicUUID) {
-              await characteristic.write(result.codeUnits,
-                  withoutResponse: true);
+              await characteristic.write(result.codeUnits);
             }
           }
         }
@@ -106,17 +123,29 @@ class ScanScreenState extends State<ScanScreen> {
   }
 
   Future<void> connectAndNavigate(BluetoothDevice device) async {
-    try {
-      await device.connect(); // Attempt to connect to the device
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => DeviceScreen(device: device),
-      )); // Navigate to DeviceScreen on successful connection
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage =
-              'Failed to connect: $e'; // Update the error message on failure
-        });
+    int retryCount = 0;
+    bool connected = false;
+    while (!connected && retryCount < 3) {
+      try {
+        await device.connect(timeout: const Duration(seconds: 10));
+        connected = true;
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('lastConnectedDeviceId', device.id.id);
+        _connectedDevice = device;
+        if (mounted) {
+          await sendMusicInfo(device);
+          Navigator.of(context).push(MaterialPageRoute(
+            builder: (context) => DeviceScreen(device: device),
+          ));
+        }
+      } catch (e) {
+        retryCount++;
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Failed to connect: $e (attempt $retryCount)';
+          });
+        }
+        await Future.delayed(const Duration(seconds: 2));
       }
     }
   }
@@ -125,73 +154,54 @@ class ScanScreenState extends State<ScanScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Scan for Devices')),
-      body: RefreshIndicator(
-        onRefresh: () =>
-            FlutterBluePlus.startScan(timeout: const Duration(seconds: 4)),
-        child: SingleChildScrollView(
-          child: Column(
-            children: <Widget>[
-              if (_errorMessage.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Error: $_errorMessage',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text('Scan Status: $_scanStatus'),
+      body: Column(
+        children: <Widget>[
+          if (_errorMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                'Error: $_errorMessage',
+                style: const TextStyle(color: Colors.red),
               ),
-              StreamBuilder<List<ScanResult>>(
-                stream: FlutterBluePlus.scanResults,
-                initialData: const [],
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.data!.isEmpty) {
-                    return const Center(child: Text("No devices found."));
-                  }
-                  return Column(
-                    children: snapshot.data!.map((r) {
-                      return ListTile(
-                        title: Text(r.device.name.isEmpty
-                            ? "Unknown Device"
-                            : r.device.name),
-                        subtitle: Text(r.device.id.toString()),
-                        trailing: ElevatedButton(
-                          onPressed: () async {
-                            try {
-                              await r.device.connect();
-                              await sendMusicInfo(r.device);
-                              if (mounted) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        DeviceScreen(device: r.device),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                setState(() {
-                                  _errorMessage = e.toString();
-                                });
-                              }
-                            }
-                          },
-                          child: const Text("CONNECT"),
-                        ),
-                      );
-                    }).toList(),
-                  );
-                },
-              ),
-            ],
+            ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text('Scan Status: $_scanStatus'),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child:
+                Text('Connected Device: ${_connectedDevice?.name ?? 'None'}'),
+          ),
+          Expanded(
+            child: StreamBuilder<List<ScanResult>>(
+              stream: FlutterBluePlus.scanResults,
+              initialData: const [],
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.data!.isEmpty) {
+                  return const Center(child: Text("No devices found."));
+                }
+                return ListView(
+                  children: snapshot.data!.map((ScanResult result) {
+                    return ListTile(
+                      title: Text(result.device.name.isEmpty
+                          ? "Unknown Device"
+                          : result.device.name),
+                      subtitle: Text(result.device.id.toString()),
+                      trailing: ElevatedButton(
+                        onPressed: () => connectAndNavigate(result.device),
+                        child: const Text("CONNECT"),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: StreamBuilder<bool>(
         stream: FlutterBluePlus.isScanning,
