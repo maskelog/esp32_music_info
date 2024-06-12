@@ -4,7 +4,7 @@ import 'package:music_info/screens/device_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
-import 'package:flutter/services.dart';
+import 'package:music_info/utils/utils.dart'; // Import the utils file
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -16,8 +16,6 @@ class ScanScreen extends StatefulWidget {
 class ScanScreenState extends State<ScanScreen> {
   String _scanStatus = "Idle";
   String _errorMessage = "";
-  static const platform =
-      MethodChannel('com.example.ble_music_info/music_info');
   BluetoothDevice? _connectedDevice;
 
   @override
@@ -97,31 +95,6 @@ class ScanScreenState extends State<ScanScreen> {
     }
   }
 
-  Future<void> sendMusicInfo(BluetoothDevice device) async {
-    try {
-      final String result = await platform.invokeMethod('getMusicInfo');
-      List<BluetoothService> services = await device.discoverServices();
-      for (BluetoothService service in services) {
-        var targetServiceUUID = "3db02924-b2a6-4d47-be1f-0f90ad62a048";
-        if (service.uuid.toString() == targetServiceUUID) {
-          var targetCharacteristicUUID = "8d8218b6-97bc-4527-a8db-13094ac06b1d";
-          for (BluetoothCharacteristic characteristic
-              in service.characteristics) {
-            if (characteristic.uuid.toString() == targetCharacteristicUUID) {
-              await characteristic.write(result.codeUnits);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.toString();
-        });
-      }
-    }
-  }
-
   Future<void> connectAndNavigate(BluetoothDevice device) async {
     int retryCount = 0;
     bool connected = false;
@@ -133,11 +106,12 @@ class ScanScreenState extends State<ScanScreen> {
         await prefs.setString('lastConnectedDeviceId', device.id.id);
         _connectedDevice = device;
         if (mounted) {
-          await sendMusicInfo(device);
           Navigator.of(context).push(MaterialPageRoute(
             builder: (context) => DeviceScreen(device: device),
           ));
         }
+        await BLEUtils.sendMusicInfo(
+            device); // Automatically send music info after connecting
       } catch (e) {
         retryCount++;
         if (mounted) {

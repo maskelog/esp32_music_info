@@ -1,4 +1,33 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+
+class BLEUtils {
+  static const platform =
+      MethodChannel('com.example.ble_music_info/music_info');
+
+  static Future<void> sendMusicInfo(BluetoothDevice device) async {
+    try {
+      final String result = await platform.invokeMethod('getMusicInfo');
+      List<BluetoothService> services = await device.discoverServices();
+      for (BluetoothService service in services) {
+        var targetServiceUUID = "3db02924-b2a6-4d47-be1f-0f90ad62a048";
+        if (service.uuid.toString() == targetServiceUUID) {
+          var targetCharacteristicUUID = "8d8218b6-97bc-4527-a8db-13094ac06b1d";
+          for (BluetoothCharacteristic characteristic
+              in service.characteristics) {
+            if (characteristic.uuid.toString() == targetCharacteristicUUID) {
+              await characteristic.write(result.codeUnits,
+                  withoutResponse: true);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("Error sending music info: $e");
+    }
+  }
+}
 
 // It is essentially a stream but:
 //  1. we cache the latestValue of the stream
