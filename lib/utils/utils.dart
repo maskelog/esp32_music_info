@@ -1,14 +1,23 @@
-import 'dart:async';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'dart:async';
 
 class BLEUtils {
   static const platform =
       MethodChannel('com.example.ble_music_info/music_info');
 
-  static Future<void> sendMusicInfo(BluetoothDevice device) async {
+  static Future<String> getMusicInfo() async {
     try {
       final String result = await platform.invokeMethod('getMusicInfo');
+      return result;
+    } catch (e) {
+      return "Error retrieving music info: $e";
+    }
+  }
+
+  static Future<void> sendMusicInfo(BluetoothDevice device) async {
+    try {
+      final String result = await getMusicInfo();
       List<BluetoothService> services = await device.discoverServices();
       for (BluetoothService service in services) {
         var targetServiceUUID = "3db02924-b2a6-4d47-be1f-0f90ad62a048";
@@ -27,22 +36,10 @@ class BLEUtils {
       print("Error sending music info: $e");
     }
   }
-
-  static Future<String> getMusicInfo() async {
-    try {
-      final String result = await platform.invokeMethod('getMusicInfo');
-      return result;
-    } catch (e) {
-      print("Error getting music info: $e");
-      return "Error";
-    }
-  }
 }
 
-// StreamControllerReemit class
 class StreamControllerReemit<T> {
   T? _latestValue;
-
   final StreamController<T> _controller = StreamController<T>.broadcast();
 
   StreamControllerReemit({T? initialValue}) : _latestValue = initialValue;
@@ -65,14 +62,12 @@ class StreamControllerReemit<T> {
   }
 }
 
-// return a new stream that immediately emits an initial value
 extension _StreamNewStreamWithInitialValue<T> on Stream<T> {
   Stream<T> newStreamWithInitialValue(T initialValue) {
     return transform(_NewStreamWithInitialValueTransformer(initialValue));
   }
 }
 
-// Helper for 'newStreamWithInitialValue' method for streams.
 class _NewStreamWithInitialValueTransformer<T>
     extends StreamTransformerBase<T, T> {
   final T initialValue;
@@ -129,14 +124,17 @@ class _NewStreamWithInitialValueTransformer<T>
     }
 
     if (broadcast) {
-      controller =
-          StreamController<T>.broadcast(onListen: onListen, onCancel: onCancel);
+      controller = StreamController<T>.broadcast(
+        onListen: onListen,
+        onCancel: onCancel,
+      );
     } else {
       controller = StreamController<T>(
-          onListen: onListen,
-          onPause: onPause,
-          onResume: onResume,
-          onCancel: onCancel);
+        onListen: onListen,
+        onPause: onPause,
+        onResume: onResume,
+        onCancel: onCancel,
+      );
     }
 
     return controller.stream;

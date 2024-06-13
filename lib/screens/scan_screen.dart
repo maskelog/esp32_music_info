@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:music_info/utils/utils.dart'; // Ensure you have the correct path
 import 'package:music_info/screens/device_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
-import 'package:music_info/utils/utils.dart';
 
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
@@ -16,14 +15,28 @@ class ScanScreen extends StatefulWidget {
 class ScanScreenState extends State<ScanScreen> {
   String _scanStatus = "Idle";
   String _errorMessage = "";
-  BluetoothDevice? _connectedDevice;
   String _musicInfo = "None";
+  BluetoothDevice? _connectedDevice;
 
   @override
   void initState() {
     super.initState();
     requestPermissions();
     _loadLastConnectedDevice();
+    _getMusicInfo();
+  }
+
+  Future<void> _getMusicInfo() async {
+    try {
+      final String result = await BLEUtils.getMusicInfo();
+      setState(() {
+        _musicInfo = result;
+      });
+    } catch (e) {
+      setState(() {
+        _musicInfo = "Error retrieving music info: $e";
+      });
+    }
   }
 
   Future<void> _loadLastConnectedDevice() async {
@@ -106,11 +119,9 @@ class ScanScreenState extends State<ScanScreen> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('lastConnectedDeviceId', device.id.id);
         _connectedDevice = device;
-        _musicInfo = await BLEUtils.getMusicInfo();
         if (mounted) {
           Navigator.of(context).push(MaterialPageRoute(
-            builder: (context) =>
-                DeviceScreen(device: device, musicInfo: _musicInfo),
+            builder: (context) => DeviceScreen(device: device),
           ));
         }
       } catch (e) {
