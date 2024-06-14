@@ -6,30 +6,31 @@ class BLEUtils {
   static const platform =
       MethodChannel('com.example.ble_music_info/music_info');
 
+  // Method to get music info from native code
   static Future<String> getMusicInfo() async {
     try {
       final String result = await platform.invokeMethod('getMusicInfo');
-      print("Music Info from Native: $result"); // Debug log
+      print("Music Info from Native: $result");
       return result;
     } catch (e) {
       return "Error retrieving music info: $e";
     }
   }
 
+  // Method to send music info to the connected BLE device
   static Future<void> sendMusicInfo(BluetoothDevice device) async {
     try {
       final String result = await getMusicInfo();
       List<BluetoothService> services = await device.discoverServices();
       for (BluetoothService service in services) {
-        var targetServiceUUID = "3db02924-b2a6-4d47-be1f-0f90ad62a048";
-        if (service.uuid.toString() == targetServiceUUID) {
-          var targetCharacteristicUUID = "8d8218b6-97bc-4527-a8db-13094ac06b1d";
+        if (service.uuid.toString() == '3db02924-b2a6-4d47-be1f-0f90ad62a048') {
           for (BluetoothCharacteristic characteristic
               in service.characteristics) {
-            if (characteristic.uuid.toString() == targetCharacteristicUUID) {
+            if (characteristic.uuid.toString() ==
+                '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
               await characteristic.write(result.codeUnits,
                   withoutResponse: true);
-              print("Music Info sent over BLE: $result"); // Debug log
+              print("Music Info sent over BLE: $result");
             }
           }
         }

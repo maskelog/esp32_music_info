@@ -5,22 +5,69 @@ import 'package:music_info/widgets/characteristic_tile.dart';
 import 'package:music_info/widgets/descriptor_tile.dart';
 import 'package:music_info/widgets/service_tile.dart';
 
-class DeviceScreen extends StatelessWidget {
+class DeviceScreen extends StatefulWidget {
   const DeviceScreen({super.key, required this.device});
 
   final BluetoothDevice device;
 
   @override
+  DeviceScreenState createState() => DeviceScreenState();
+}
+
+class DeviceScreenState extends State<DeviceScreen> {
+  String musicInfo = "None";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMusicInfo();
+  }
+
+  Future<void> _loadMusicInfo() async {
+    try {
+      final String result = await BLEUtils.getMusicInfo();
+      if (mounted) {
+        setState(() {
+          musicInfo = result;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          musicInfo = "Error retrieving music info: $e";
+        });
+      }
+    }
+  }
+
+  Future<void> _sendMusicInfo() async {
+    try {
+      await BLEUtils.sendMusicInfo(widget.device);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Music info sent successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error sending music info: $e')),
+        );
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(device.name),
+        title: Text(widget.device.name),
       ),
       body: SingleChildScrollView(
         child: Column(
           children: <Widget>[
             StreamBuilder<BluetoothConnectionState>(
-              stream: device.connectionState,
+              stream: widget.device.connectionState,
               initialData: BluetoothConnectionState.connecting,
               builder: (c, snapshot) {
                 if (snapshot.data == BluetoothConnectionState.connected) {
@@ -38,7 +85,7 @@ class DeviceScreen extends StatelessWidget {
               },
             ),
             StreamBuilder<int>(
-              stream: device.mtu,
+              stream: widget.device.mtu,
               initialData: 0,
               builder: (c, snapshot) => ListTile(
                 title: const Text('MTU Size'),
@@ -46,7 +93,7 @@ class DeviceScreen extends StatelessWidget {
               ),
             ),
             StreamBuilder<List<BluetoothService>>(
-              stream: device.services,
+              stream: widget.device.services,
               initialData: const [],
               builder: (c, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -83,20 +130,14 @@ class DeviceScreen extends StatelessWidget {
                 );
               },
             ),
-            FutureBuilder<String>(
-              future: BLEUtils.getMusicInfo(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Text('Error retrieving music info: ${snapshot.error}');
-                }
-                return ListTile(
-                  title: const Text('Music Info'),
-                  subtitle: Text(snapshot.data ?? 'None'),
-                );
-              },
+            ListTile(
+              title: const Text('Music Info'),
+              subtitle: Text(musicInfo),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _sendMusicInfo,
+              child: const Text('Send Music Info'),
             ),
           ],
         ),

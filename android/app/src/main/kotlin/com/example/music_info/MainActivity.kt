@@ -35,9 +35,10 @@ class MainActivity : FlutterActivity() {
 
     private val musicInfoReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val musicInfo = intent.getStringExtra("music_info") ?: "None"
-            println("Broadcast received: $musicInfo") // 디버그 로그 추가
+            musicInfo = intent.getStringExtra("music_info") ?: "None"
+            println("Broadcast received: $musicInfo")
             sendMusicInfoToBLE(musicInfo)
+            updateUI()
         }
     }
 
@@ -123,6 +124,20 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // BLE 디바이스 연결 상태 처리
+    private fun onDeviceConnected(deviceAddress: String) {
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
+        connectedDevice = device
+        bluetoothGatt = device.connectGatt(this, false, gattCallback)
+    }
+
+    private fun onDeviceDisconnected() {
+        connectedDevice = null
+        bluetoothGatt?.close()
+        bluetoothGatt = null
+    }
+
     private fun sendMusicInfoToBLE(info: String) {
         val gattService = bluetoothGatt?.getService(java.util.UUID.fromString("3db02924-b2a6-4d47-be1f-0f90ad62a048"))
         val characteristic = gattService?.getCharacteristic(java.util.UUID.fromString("8d8218b6-97bc-4527-a8db-13094ac06b1d"))
@@ -130,9 +145,9 @@ class MainActivity : FlutterActivity() {
         if (characteristic != null) {
             characteristic.value = info.toByteArray()
             bluetoothGatt?.writeCharacteristic(characteristic)
-            println("BLE characteristic written: $info") // 디버그 로그 추가
+            println("BLE characteristic written: $info") // Debug log
         } else {
-            println("Failed to find characteristic.") // 디버그 로그 추가
+            println("Failed to find characteristic.") // Debug log
         }
     }
 
@@ -141,10 +156,16 @@ class MainActivity : FlutterActivity() {
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 println("Connected to GATT server.")
                 gatt.discoverServices()
+                runOnUiThread {
+                    updateUI()
+                }
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 println("Disconnected from GATT server.")
                 bluetoothGatt?.close()
                 bluetoothGatt = null
+                runOnUiThread {
+                    updateUI()
+                }
             }
         }
 
@@ -165,18 +186,10 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // BLE 디바이스 연결 상태 처리
-    private fun onDeviceConnected(deviceAddress: String) {
-        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-        val device = bluetoothAdapter.getRemoteDevice(deviceAddress)
-        connectedDevice = device
-        bluetoothGatt = device.connectGatt(this, false, gattCallback)
-    }
-
-    private fun onDeviceDisconnected() {
-        connectedDevice = null
-        bluetoothGatt?.close()
-        bluetoothGatt = null
+    private fun updateUI() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+        startActivity(intent)
     }
 
     override fun onDestroy() {
