@@ -1,29 +1,64 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'screens/bluetooth_off_screen.dart';
-import 'screens/scan_screen.dart';
+import 'package:music_info/screens/scan_screen.dart';
 
 void main() {
-  runApp(const FlutterBlueApp());
+  runApp(const MyApp());
 }
 
-class FlutterBlueApp extends StatelessWidget {
-  const FlutterBlueApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      color: Colors.lightBlue,
-      home: StreamBuilder<BluetoothAdapterState>(
-        stream: FlutterBluePlus.adapterState,
-        initialData: BluetoothAdapterState.unknown,
-        builder: (c, snapshot) {
-          final state = snapshot.data!;
-          if (state == BluetoothAdapterState.on) {
-            return const ScanScreen();
-          }
-          return BluetoothOffScreen(adapterState: state);
-        },
+      title: 'Flutter BLE Demo',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: const MyHomePage(),
+    );
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
+
+  @override
+  MyHomePageState createState() => MyHomePageState();
+}
+
+class MyHomePageState extends State<MyHomePage> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize anything if needed
+  }
+
+  void _navigateToScanScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ScanScreen()),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Flutter BLE Demo'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text('Welcome to the BLE Demo'),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _navigateToScanScreen,
+              child: const Text('Go to Device Screen'),
+            ),
+          ],
+        ),
       ),
     );
   }

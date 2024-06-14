@@ -9,6 +9,7 @@ class BLEUtils {
   static Future<String> getMusicInfo() async {
     try {
       final String result = await platform.invokeMethod('getMusicInfo');
+      print("Music Info from Native: $result"); // Debug log
       return result;
     } catch (e) {
       return "Error retrieving music info: $e";
@@ -28,6 +29,7 @@ class BLEUtils {
             if (characteristic.uuid.toString() == targetCharacteristicUUID) {
               await characteristic.write(result.codeUnits,
                   withoutResponse: true);
+              print("Music Info sent over BLE: $result"); // Debug log
             }
           }
         }
