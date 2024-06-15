@@ -22,6 +22,7 @@ class DeviceScreenState extends State<DeviceScreen> {
     super.initState();
     _loadMusicInfo();
     _subscribeToCharacteristic();
+    BLEUtils.monitorMusicInfo(widget.device);
   }
 
   Future<void> _loadMusicInfo() async {
@@ -37,23 +38,6 @@ class DeviceScreenState extends State<DeviceScreen> {
         setState(() {
           musicInfo = "Error retrieving music info: $e";
         });
-      }
-    }
-  }
-
-  Future<void> _sendMusicInfo() async {
-    try {
-      await BLEUtils.sendMusicInfo(widget.device);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Music info sent successfully!')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending music info: $e')),
-        );
       }
     }
   }
@@ -135,7 +119,8 @@ class DeviceScreenState extends State<DeviceScreen> {
                             });
                           },
                           onWritePressed: () async {
-                            await BLEUtils.sendMusicInfo(widget.device);
+                            await BLEUtils.sendMusicInfo(
+                                widget.device, musicInfo);
                           },
                           onNotificationPressed: () async {
                             await c.setNotifyValue(!c.isNotifying);
@@ -161,7 +146,10 @@ class DeviceScreenState extends State<DeviceScreen> {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _sendMusicInfo,
+              onPressed: () async {
+                String currentMusicInfo = await BLEUtils.getMusicInfo();
+                await BLEUtils.sendMusicInfo(widget.device, currentMusicInfo);
+              },
               child: const Text('Send Music Info'),
             ),
           ],

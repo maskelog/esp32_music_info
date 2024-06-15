@@ -18,9 +18,9 @@ class BLEUtils {
   }
 
   // Method to send music info to the connected BLE device
-  static Future<void> sendMusicInfo(BluetoothDevice device) async {
+  static Future<void> sendMusicInfo(
+      BluetoothDevice device, String musicInfo) async {
     try {
-      final String result = await getMusicInfo();
       List<BluetoothService> services = await device.discoverServices();
       for (BluetoothService service in services) {
         if (service.uuid.toString() == '3db02924-b2a6-4d47-be1f-0f90ad62a048') {
@@ -28,9 +28,9 @@ class BLEUtils {
               in service.characteristics) {
             if (characteristic.uuid.toString() ==
                 '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
-              await characteristic.write(result.codeUnits,
+              await characteristic.write(musicInfo.codeUnits,
                   withoutResponse: false);
-              print("Music Info sent over BLE: $result");
+              print("Music Info sent over BLE: $musicInfo");
             }
           }
         }
@@ -38,6 +38,19 @@ class BLEUtils {
     } catch (e) {
       print("Error sending music info: $e");
     }
+  }
+
+  // Method to monitor music info changes and send to BLE device
+  static Future<void> monitorMusicInfo(BluetoothDevice device) async {
+    String previousMusicInfo = "";
+
+    Timer.periodic(const Duration(seconds: 2), (timer) async {
+      String currentMusicInfo = await getMusicInfo();
+      if (currentMusicInfo != previousMusicInfo) {
+        previousMusicInfo = currentMusicInfo;
+        await sendMusicInfo(device, currentMusicInfo);
+      }
+    });
   }
 
   // Method to send current time to the connected BLE device
