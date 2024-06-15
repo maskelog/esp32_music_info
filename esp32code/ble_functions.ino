@@ -20,12 +20,10 @@ void handleBLE()
         memcpy(musicInfo, value, length);
         musicInfo[length] = '\0'; // Null-terminate the char array
 
-        // Display the music info on the OLED
+        // Display the music info on the OLED using EURK
         display.clearDisplay();
-        display.setTextSize(1);
-        display.setTextColor(SSD1306_WHITE);
-        display.setCursor(0, 10);
-        display.print(musicInfo);
+        EURK_setxy(0, 0);     // 출력할 문자(혹은 문자열)의 좌표 설정
+        EURK_puts(musicInfo); // 화면에 문자열 출력
         display.display();
 
         Serial.print("Received music info: ");

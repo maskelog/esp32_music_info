@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:music_info/utils/utils.dart';
@@ -53,7 +54,7 @@ class DeviceScreenState extends State<DeviceScreen> {
             await characteristic.setNotifyValue(true);
             characteristic.value.listen((value) {
               setState(() {
-                musicInfo = String.fromCharCodes(value);
+                musicInfo = utf8.decode(value); // UTF-8 디코딩 사용
               });
             });
           }
@@ -115,7 +116,7 @@ class DeviceScreenState extends State<DeviceScreen> {
                           onReadPressed: () async {
                             final value = await c.read();
                             setState(() {
-                              musicInfo = String.fromCharCodes(value);
+                              musicInfo = utf8.decode(value); // UTF-8 디코딩 사용
                             });
                           },
                           onWritePressed: () async {

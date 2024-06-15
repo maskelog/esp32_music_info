@@ -2,6 +2,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <ArduinoBLE.h>
+#include <EURK_Arduino.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
@@ -30,6 +31,9 @@ void setup()
   delay(2000); // 초기화 완료 후 지연 시간 추가
   display.clearDisplay();
   Serial.println("Display initialized");
+
+  // EURK 초기화
+  EURK_hancode(HANCODE_UTF_8); // 한글 코드 설정 (UTF-8)
 
   // BLE 초기화
   if (!BLE.begin())

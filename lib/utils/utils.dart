@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
@@ -28,7 +29,7 @@ class BLEUtils {
               in service.characteristics) {
             if (characteristic.uuid.toString() ==
                 '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
-              await characteristic.write(musicInfo.codeUnits,
+              await characteristic.write(utf8.encode(musicInfo), // UTF-8 인코딩 사용
                   withoutResponse: false);
               print("Music Info sent over BLE: $musicInfo");
             }
@@ -37,6 +38,17 @@ class BLEUtils {
       }
     } catch (e) {
       print("Error sending music info: $e");
+    }
+  }
+
+  // Method to monitor connected devices
+  static Future<void> monitorConnectedDevices() async {
+    while (true) {
+      List<BluetoothDevice> connectedDevices = FlutterBluePlus.connectedDevices;
+      for (BluetoothDevice device in connectedDevices) {
+        await monitorMusicInfo(device);
+      }
+      await Future.delayed(const Duration(seconds: 10));
     }
   }
 
