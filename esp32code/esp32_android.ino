@@ -3,16 +3,22 @@
 #include <Adafruit_SSD1306.h>
 #include <ArduinoBLE.h>
 #include <EURK_Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
 #define OLED_RESET -1
+#define SCROLL_DELAY 100 // 슬라이드 딜레이
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // BLE 서비스와 특성 정의
 BLEService musicService("3db02924-b2a6-4d47-be1f-0f90ad62a048");
 BLECharacteristic musicCharacteristic("8d8218b6-97bc-4527-a8db-13094ac06b1d", BLERead | BLEWrite, 512);
+
+String currentMusicInfo = "음악 정보 표시기 - 아티스트";
+TaskHandle_t scrollTaskHandle;
 
 void setup()
 {
@@ -53,6 +59,9 @@ void setup()
   BLE.advertise();
 
   Serial.println("Bluetooth device active, waiting for connections...");
+
+  // 스크롤 텍스트를 위한 태스크 생성
+  xTaskCreate(scrollTextTask, "ScrollTextTask", 4096, NULL, 1, &scrollTaskHandle);
 }
 
 void loop()
