@@ -25,23 +25,12 @@ void handleBLE()
         Serial.print("Received music info: ");
         Serial.println(musicInfoStr);
 
-        // Split the music info into artist and title
-        String artist = musicInfoStr.substring(0, musicInfoStr.indexOf(" - "));
-        String title = musicInfoStr.substring(musicInfoStr.indexOf(" - ") + 3);
-
-        Serial.print("Parsed Artist: ");
-        Serial.println(artist);
-        Serial.print("Parsed Title: ");
-        Serial.println(title);
-
-        // Display the artist and title on the OLED
+        // Display the music info on the OLED
         display.clearDisplay();
         display.setTextSize(1);
         display.setTextColor(SSD1306_WHITE);
         display.setCursor(0, 10);
-        display.print("Now Playing:");
-        display.setCursor(0, 20);
-        display.print(artist + " - " + title);
+        display.print(musicInfoStr);
         display.display();
       }
       delay(100); // Add a small delay to avoid flooding the loop

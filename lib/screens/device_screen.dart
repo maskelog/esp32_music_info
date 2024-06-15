@@ -21,6 +21,7 @@ class DeviceScreenState extends State<DeviceScreen> {
   void initState() {
     super.initState();
     _loadMusicInfo();
+    _subscribeToCharacteristic();
   }
 
   Future<void> _loadMusicInfo() async {
@@ -53,6 +54,26 @@ class DeviceScreenState extends State<DeviceScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error sending music info: $e')),
         );
+      }
+    }
+  }
+
+  Future<void> _subscribeToCharacteristic() async {
+    List<BluetoothService> services = await widget.device.discoverServices();
+    for (BluetoothService service in services) {
+      if (service.uuid.toString() == '3db02924-b2a6-4d47-be1f-0f90ad62a048') {
+        for (BluetoothCharacteristic characteristic
+            in service.characteristics) {
+          if (characteristic.uuid.toString() ==
+              '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
+            await characteristic.setNotifyValue(true);
+            characteristic.value.listen((value) {
+              setState(() {
+                musicInfo = String.fromCharCodes(value);
+              });
+            });
+          }
+        }
       }
     }
   }
@@ -107,10 +128,14 @@ class DeviceScreenState extends State<DeviceScreen> {
                       characteristicTiles: s.characteristics.map((c) {
                         return CharacteristicTile(
                           characteristic: c,
-                          onReadPressed: () => c.read(),
+                          onReadPressed: () async {
+                            final value = await c.read();
+                            setState(() {
+                              musicInfo = String.fromCharCodes(value);
+                            });
+                          },
                           onWritePressed: () async {
-                            await c.write([0x12, 0x34]);
-                            await c.read();
+                            await BLEUtils.sendMusicInfo(widget.device);
                           },
                           onNotificationPressed: () async {
                             await c.setNotifyValue(!c.isNotifying);

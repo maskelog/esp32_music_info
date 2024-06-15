@@ -29,7 +29,7 @@ class BLEUtils {
             if (characteristic.uuid.toString() ==
                 '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
               await characteristic.write(result.codeUnits,
-                  withoutResponse: true);
+                  withoutResponse: false);
               print("Music Info sent over BLE: $result");
             }
           }
@@ -37,6 +37,31 @@ class BLEUtils {
       }
     } catch (e) {
       print("Error sending music info: $e");
+    }
+  }
+
+  // Method to send current time to the connected BLE device
+  static Future<void> sendCurrentTime(BluetoothDevice device) async {
+    try {
+      final DateTime now = DateTime.now();
+      final String currentTime =
+          "${now.hour % 12}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}";
+      List<BluetoothService> services = await device.discoverServices();
+      for (BluetoothService service in services) {
+        if (service.uuid.toString() == '3db02924-b2a6-4d47-be1f-0f90ad62a048') {
+          for (BluetoothCharacteristic characteristic
+              in service.characteristics) {
+            if (characteristic.uuid.toString() ==
+                '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
+              await characteristic.write(currentTime.codeUnits,
+                  withoutResponse: true);
+              print("Current Time sent over BLE: $currentTime");
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print("Error sending current time: $e");
     }
   }
 }

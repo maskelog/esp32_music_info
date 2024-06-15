@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:music_info/utils/utils.dart'; // Ensure you have the correct path
+import 'package:music_info/utils/utils.dart';
 import 'package:music_info/screens/device_screen.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
