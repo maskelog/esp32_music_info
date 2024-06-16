@@ -8,13 +8,22 @@ class BLEUtils {
       MethodChannel('com.example.ble_music_info/music_info');
 
   // Method to get music info from native code
-  static Future<String> getMusicInfo() async {
+  static Future<Map<String, String>> getMusicInfo() async {
     try {
-      final String result = await platform.invokeMethod('getMusicInfo');
+      final String? result =
+          await platform.invokeMethod<String>('getMusicInfo');
       print("Music Info from Native: $result");
-      return result;
+
+      if (result != null && result.isNotEmpty) {
+        List<String> parts = result.split(' - ');
+        if (parts.length == 2) {
+          return {"title": parts[0], "artist": parts[1]};
+        }
+      }
+      return {"title": "Unknown", "artist": "Unknown"};
     } catch (e) {
-      return "Error retrieving music info: $e";
+      print("Error retrieving music info: $e");
+      return {"title": "Error", "artist": "Error retrieving music info: $e"};
     }
   }
 
@@ -29,7 +38,7 @@ class BLEUtils {
               in service.characteristics) {
             if (characteristic.uuid.toString() ==
                 '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
-              await characteristic.write(utf8.encode(musicInfo), // UTF-8 인코딩 사용
+              await characteristic.write(utf8.encode(musicInfo),
                   withoutResponse: false);
               print("Music Info sent over BLE: $musicInfo");
             }
@@ -41,26 +50,19 @@ class BLEUtils {
     }
   }
 
-  // Method to monitor connected devices
-  static Future<void> monitorConnectedDevices() async {
-    while (true) {
-      List<BluetoothDevice> connectedDevices = FlutterBluePlus.connectedDevices;
-      for (BluetoothDevice device in connectedDevices) {
-        await monitorMusicInfo(device);
-      }
-      await Future.delayed(const Duration(seconds: 10));
-    }
-  }
-
   // Method to monitor music info changes and send to BLE device
   static Future<void> monitorMusicInfo(BluetoothDevice device) async {
     String previousMusicInfo = "";
 
     Timer.periodic(const Duration(seconds: 2), (timer) async {
-      String currentMusicInfo = await getMusicInfo();
-      if (currentMusicInfo != previousMusicInfo) {
-        previousMusicInfo = currentMusicInfo;
-        await sendMusicInfo(device, currentMusicInfo);
+      Map<String, String> currentMusicInfo = await getMusicInfo();
+      String formattedMusicInfo =
+          "${currentMusicInfo['title']} - ${currentMusicInfo['artist']}";
+      if (formattedMusicInfo != previousMusicInfo &&
+          currentMusicInfo['title'] != "Unknown" &&
+          currentMusicInfo['artist'] != "Unknown") {
+        previousMusicInfo = formattedMusicInfo;
+        await sendMusicInfo(device, formattedMusicInfo);
       }
     });
   }
@@ -87,6 +89,27 @@ class BLEUtils {
       }
     } catch (e) {
       print("Error sending current time: $e");
+    }
+  }
+
+  // Method to get available music players
+  static Future<List<String>> getAvailablePlayers() async {
+    try {
+      final List<dynamic>? result =
+          await platform.invokeMethod<List<dynamic>>('getAvailablePlayers');
+      return result?.cast<String>() ?? [];
+    } catch (e) {
+      print("Error retrieving available players: $e");
+      return [];
+    }
+  }
+
+  // Method to select music player
+  static Future<void> selectPlayer(String player) async {
+    try {
+      await platform.invokeMethod('selectPlayer', {"player": player});
+    } catch (e) {
+      print("Error selecting player: $e");
     }
   }
 }
@@ -177,17 +200,14 @@ class _NewStreamWithInitialValueTransformer<T>
     }
 
     if (broadcast) {
-      controller = StreamController<T>.broadcast(
-        onListen: onListen,
-        onCancel: onCancel,
-      );
+      controller =
+          StreamController<T>.broadcast(onListen: onListen, onCancel: onCancel);
     } else {
       controller = StreamController<T>(
-        onListen: onListen,
-        onPause: onPause,
-        onResume: onResume,
-        onCancel: onCancel,
-      );
+          onListen: onListen,
+          onPause: onPause,
+          onResume: onResume,
+          onCancel: onCancel);
     }
 
     return controller.stream;

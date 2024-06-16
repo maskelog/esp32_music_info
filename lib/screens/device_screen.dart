@@ -28,11 +28,13 @@ class DeviceScreenState extends State<DeviceScreen> {
 
   Future<void> _loadMusicInfo() async {
     try {
-      final String result = await BLEUtils.getMusicInfo();
-      if (mounted) {
-        setState(() {
-          musicInfo = result;
-        });
+      final Map<String, String> result = await BLEUtils.getMusicInfo();
+      if (result['title'] != "Unknown" && result['artist'] != "Unknown") {
+        if (mounted) {
+          setState(() {
+            musicInfo = "${result['title']} - ${result['artist']}";
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -53,9 +55,12 @@ class DeviceScreenState extends State<DeviceScreen> {
               '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
             await characteristic.setNotifyValue(true);
             characteristic.value.listen((value) {
-              setState(() {
-                musicInfo = utf8.decode(value); // UTF-8 디코딩 사용
-              });
+              String newMusicInfo = utf8.decode(value);
+              if (newMusicInfo.contains(" - ")) {
+                setState(() {
+                  musicInfo = newMusicInfo;
+                });
+              }
             });
           }
         }
@@ -148,8 +153,15 @@ class DeviceScreenState extends State<DeviceScreen> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () async {
-                String currentMusicInfo = await BLEUtils.getMusicInfo();
-                await BLEUtils.sendMusicInfo(widget.device, currentMusicInfo);
+                Map<String, String> currentMusicInfo =
+                    await BLEUtils.getMusicInfo();
+                if (currentMusicInfo['title'] != "Unknown" &&
+                    currentMusicInfo['artist'] != "Unknown") {
+                  String formattedMusicInfo =
+                      "${currentMusicInfo['title']} - ${currentMusicInfo['artist']}";
+                  await BLEUtils.sendMusicInfo(
+                      widget.device, formattedMusicInfo);
+                }
               },
               child: const Text('Send Music Info'),
             ),

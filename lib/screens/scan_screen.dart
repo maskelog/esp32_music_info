@@ -16,6 +16,8 @@ class ScanScreenState extends State<ScanScreen> {
   String _scanStatus = "Idle";
   String _errorMessage = "";
   String _musicInfo = "None";
+  String? _selectedPlayer;
+  List<String> _availablePlayers = [];
   BluetoothDevice? _connectedDevice;
 
   @override
@@ -24,13 +26,27 @@ class ScanScreenState extends State<ScanScreen> {
     requestPermissions();
     _loadLastConnectedDevice();
     _getMusicInfo();
+    _loadAvailablePlayers();
+  }
+
+  Future<void> _loadAvailablePlayers() async {
+    try {
+      List<String> players = await BLEUtils.getAvailablePlayers();
+      setState(() {
+        _availablePlayers = players;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error retrieving available players: $e";
+      });
+    }
   }
 
   Future<void> _getMusicInfo() async {
     try {
-      final String result = await BLEUtils.getMusicInfo();
+      final Map<String, String> result = await BLEUtils.getMusicInfo();
       setState(() {
-        _musicInfo = result;
+        _musicInfo = "${result['title']} - ${result['artist']}";
       });
     } catch (e) {
       setState(() {
@@ -136,6 +152,19 @@ class ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  Future<void> _selectPlayer(String player) async {
+    try {
+      await BLEUtils.selectPlayer(player);
+      setState(() {
+        _selectedPlayer = player;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = "Error selecting player: $e";
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,6 +192,33 @@ class ScanScreenState extends State<ScanScreen> {
             padding: const EdgeInsets.all(8.0),
             child: Text('Music Info: $_musicInfo'),
           ),
+          if (_availablePlayers.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: DropdownButton<String>(
+                value: _selectedPlayer,
+                hint: const Text('Select Music Player'),
+                onChanged: (String? newValue) {
+                  if (newValue != null) {
+                    _selectPlayer(newValue);
+                  }
+                },
+                items: _availablePlayers
+                    .map<DropdownMenuItem<String>>((String player) {
+                  return DropdownMenuItem<String>(
+                    value: player,
+                    child: Text(player),
+                  );
+                }).toList(),
+              ),
+            ),
+          if (_connectedDevice != null)
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (context) => DeviceScreen(device: _connectedDevice!),
+              )),
+              child: const Text("Go to Connected Device"),
+            ),
           Expanded(
             child: StreamBuilder<List<ScanResult>>(
               stream: FlutterBluePlus.scanResults,

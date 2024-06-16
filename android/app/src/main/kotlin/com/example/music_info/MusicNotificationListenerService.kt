@@ -13,27 +13,29 @@ import androidx.annotation.RequiresApi
 
 @RequiresApi(Build.VERSION_CODES.LOLLIPOP)
 class MusicNotificationListenerService : NotificationListenerService() {
+
     companion object {
         var musicInfo: String? = "None"
     }
 
     private lateinit var mediaSessionManager: MediaSessionManager
-    private lateinit var sessionListener: MediaSessionListener
+    private val mediaSessionListener = MediaSessionListener()
 
     override fun onCreate() {
         super.onCreate()
         mediaSessionManager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
-        sessionListener = MediaSessionListener()
         mediaSessionManager.addOnActiveSessionsChangedListener(
-            sessionListener,
+            mediaSessionListener,
             ComponentName(this, MusicNotificationListenerService::class.java)
         )
-        sessionListener.onActiveSessionsChanged(mediaSessionManager.getActiveSessions(ComponentName(this, MusicNotificationListenerService::class.java)))
+        mediaSessionListener.onActiveSessionsChanged(
+            mediaSessionManager.getActiveSessions(ComponentName(this, MusicNotificationListenerService::class.java))
+        )
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        mediaSessionManager.removeOnActiveSessionsChangedListener(sessionListener)
+        mediaSessionManager.removeOnActiveSessionsChangedListener(mediaSessionListener)
     }
 
     private inner class MediaSessionListener : MediaSessionManager.OnActiveSessionsChangedListener {
@@ -44,21 +46,37 @@ class MusicNotificationListenerService : NotificationListenerService() {
                         metadata?.let {
                             val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
                             val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-                            val album = it.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: "Unknown Album"
-                            val newMusicInfo = "Title: $title\nArtist: $artist\nAlbum: $album"
+                            val newMusicInfo = "$title - $artist"
 
                             if (musicInfo != newMusicInfo) {
                                 musicInfo = newMusicInfo
-                                println("Music Info Updated: $musicInfo")
+                                println("Music Info Updated: $newMusicInfo")
 
                                 // Broadcast the music info to MainActivity
                                 val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
-                                intent.putExtra("music_info", musicInfo)
+                                intent.putExtra("music_info", newMusicInfo)
                                 sendBroadcast(intent)
                             }
                         }
                     }
                 })
+                // Retrieve initial metadata
+                val metadata = controller.metadata
+                metadata?.let {
+                    val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
+                    val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+                    val newMusicInfo = "$title - $artist"
+
+                    if (musicInfo != newMusicInfo) {
+                        musicInfo = newMusicInfo
+                        println("Music Info Updated: $newMusicInfo")
+
+                        // Broadcast the music info to MainActivity
+                        val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
+                        intent.putExtra("music_info", newMusicInfo)
+                        sendBroadcast(intent)
+                    }
+                }
             }
         }
     }
@@ -80,12 +98,12 @@ class MusicNotificationListenerService : NotificationListenerService() {
         val extras = sbn.notification.extras
         val title = extras.getString("android.title") ?: "Unknown Title"
         val artist = extras.getString("android.text") ?: "Unknown Artist"
-        val newMusicInfo = "Title: $title\nArtist: $artist"
+        val newMusicInfo = "$title - $artist"
 
         if (musicInfo != newMusicInfo) {
             musicInfo = newMusicInfo
             val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
-            intent.putExtra("music_info", musicInfo)
+            intent.putExtra("music_info", newMusicInfo)
             sendBroadcast(intent)
         }
     }

@@ -98,7 +98,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-
     private fun isNotificationServiceEnabled(): Boolean {
         val cn = ComponentName(this, MusicNotificationListenerService::class.java)
         val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners")
