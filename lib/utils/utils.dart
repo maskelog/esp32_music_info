@@ -63,6 +63,11 @@ class BLEUtils {
           currentMusicInfo['artist'] != "Unknown") {
         previousMusicInfo = formattedMusicInfo;
         await sendMusicInfo(device, formattedMusicInfo);
+      } else if (formattedMusicInfo == previousMusicInfo) {
+        await sendMusicInfo(device, formattedMusicInfo);
+      } else if (formattedMusicInfo == "Unknown - Unknown" &&
+          previousMusicInfo != "") {
+        await sendMusicInfo(device, previousMusicInfo);
       }
     });
   }

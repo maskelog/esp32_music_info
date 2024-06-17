@@ -25,8 +25,8 @@ class ScanScreenState extends State<ScanScreen> {
     super.initState();
     requestPermissions();
     _loadLastConnectedDevice();
-    _getMusicInfo();
     _loadAvailablePlayers();
+    _getMusicInfo();
   }
 
   Future<void> _loadAvailablePlayers() async {
@@ -34,10 +34,32 @@ class ScanScreenState extends State<ScanScreen> {
       List<String> players = await BLEUtils.getAvailablePlayers();
       setState(() {
         _availablePlayers = players;
+        if (_availablePlayers.isNotEmpty) {
+          _selectedPlayer = _availablePlayers[0];
+        }
       });
     } catch (e) {
       setState(() {
-        _errorMessage = "Error retrieving available players: $e";
+        _errorMessage = "사용 가능한 플레이어를 가져오는 중 오류 발생: $e";
+      });
+    }
+  }
+
+  Future<void> _selectPlayer(String? player) async {
+    if (player != null) {
+      try {
+        await BLEUtils.selectPlayer(player);
+        setState(() {
+          _errorMessage = "선택한 플레이어: $player";
+        });
+      } catch (e) {
+        setState(() {
+          _errorMessage = "플레이어 선택 중 오류 발생: $e";
+        });
+      }
+    } else {
+      setState(() {
+        _errorMessage = "음악 플레이어를 선택해주세요";
       });
     }
   }
@@ -50,7 +72,7 @@ class ScanScreenState extends State<ScanScreen> {
       });
     } catch (e) {
       setState(() {
-        _musicInfo = "Error retrieving music info: $e";
+        _musicInfo = "음악 정보를 가져오는 중 오류 발생: $e";
       });
     }
   }
@@ -86,7 +108,7 @@ class ScanScreenState extends State<ScanScreen> {
     } else {
       if (mounted) {
         setState(() {
-          _errorMessage = "Permissions not granted";
+          _errorMessage = "권한이 허용되지 않았습니다.";
         });
       }
     }
@@ -144,38 +166,30 @@ class ScanScreenState extends State<ScanScreen> {
         retryCount++;
         if (mounted) {
           setState(() {
-            _errorMessage = 'Failed to connect: $e (attempt $retryCount)';
+            _errorMessage = '연결 실패: $e (시도 $retryCount)';
           });
         }
         await Future.delayed(const Duration(seconds: 2));
       }
     }
-  }
-
-  Future<void> _selectPlayer(String player) async {
-    try {
-      await BLEUtils.selectPlayer(player);
-      setState(() {
-        _selectedPlayer = player;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = "Error selecting player: $e";
-      });
+    if (connected) {
+      BLEUtils.monitorMusicInfo(device);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan for Devices')),
+      appBar: AppBar(
+        title: const Text('Scan for Devices'),
+      ),
       body: Column(
         children: <Widget>[
           if (_errorMessage.isNotEmpty)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Text(
-                'Error: $_errorMessage',
+                '오류: $_errorMessage',
                 style: const TextStyle(color: Colors.red),
               ),
             ),
@@ -197,11 +211,12 @@ class ScanScreenState extends State<ScanScreen> {
               padding: const EdgeInsets.all(8.0),
               child: DropdownButton<String>(
                 value: _selectedPlayer,
-                hint: const Text('Select Music Player'),
+                hint: const Text('음악 플레이어 선택'),
                 onChanged: (String? newValue) {
-                  if (newValue != null) {
-                    _selectPlayer(newValue);
-                  }
+                  setState(() {
+                    _selectedPlayer = newValue;
+                    _selectPlayer(_selectedPlayer);
+                  });
                 },
                 items: _availablePlayers
                     .map<DropdownMenuItem<String>>((String player) {
@@ -211,7 +226,9 @@ class ScanScreenState extends State<ScanScreen> {
                   );
                 }).toList(),
               ),
-            ),
+            )
+          else
+            const Center(child: CircularProgressIndicator()),
           if (_connectedDevice != null)
             ElevatedButton(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(

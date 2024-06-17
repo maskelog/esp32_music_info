@@ -28,12 +28,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class MyHomePageState extends State<MyHomePage> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize anything if needed
-  }
-
   void _navigateToScanScreen() {
     Navigator.push(
       context,
@@ -51,11 +45,11 @@ class MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('Welcome to the BLE Demo'),
+            const Text('BLE Connect'),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _navigateToScanScreen,
-              child: const Text('Go to Device Screen'),
+              child: const Text('장치 검색'),
             ),
           ],
         ),

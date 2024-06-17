@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -17,22 +18,33 @@ class DeviceScreen extends StatefulWidget {
 
 class DeviceScreenState extends State<DeviceScreen> {
   String musicInfo = "None";
+  String previousMusicInfo = "None";
 
   @override
   void initState() {
     super.initState();
     _loadMusicInfo();
     _subscribeToCharacteristic();
-    BLEUtils.monitorMusicInfo(widget.device);
+    BLEUtils.monitorMusicInfo(widget.device).then((_) {
+      _getMusicInfoPeriodically();
+    });
   }
 
   Future<void> _loadMusicInfo() async {
     try {
       final Map<String, String> result = await BLEUtils.getMusicInfo();
-      if (result['title'] != "Unknown" && result['artist'] != "Unknown") {
+      String newMusicInfo = "${result['title']} - ${result['artist']}";
+      if (newMusicInfo != "Unknown - Unknown") {
         if (mounted) {
           setState(() {
-            musicInfo = "${result['title']} - ${result['artist']}";
+            musicInfo = newMusicInfo;
+            previousMusicInfo = newMusicInfo;
+          });
+        }
+      } else if (previousMusicInfo != "None") {
+        if (mounted) {
+          setState(() {
+            musicInfo = previousMusicInfo;
           });
         }
       }
@@ -56,9 +68,16 @@ class DeviceScreenState extends State<DeviceScreen> {
             await characteristic.setNotifyValue(true);
             characteristic.value.listen((value) {
               String newMusicInfo = utf8.decode(value);
-              if (newMusicInfo.contains(" - ")) {
+              if (newMusicInfo.contains(" - ") &&
+                  newMusicInfo != "Unknown - Unknown") {
                 setState(() {
                   musicInfo = newMusicInfo;
+                  previousMusicInfo = newMusicInfo;
+                });
+              } else if (newMusicInfo == "Unknown - Unknown" &&
+                  previousMusicInfo != "None") {
+                setState(() {
+                  musicInfo = previousMusicInfo;
                 });
               }
             });
@@ -66,6 +85,12 @@ class DeviceScreenState extends State<DeviceScreen> {
         }
       }
     }
+  }
+
+  void _getMusicInfoPeriodically() {
+    Timer.periodic(const Duration(seconds: 2), (timer) async {
+      await _loadMusicInfo();
+    });
   }
 
   @override
@@ -155,13 +180,9 @@ class DeviceScreenState extends State<DeviceScreen> {
               onPressed: () async {
                 Map<String, String> currentMusicInfo =
                     await BLEUtils.getMusicInfo();
-                if (currentMusicInfo['title'] != "Unknown" &&
-                    currentMusicInfo['artist'] != "Unknown") {
-                  String formattedMusicInfo =
-                      "${currentMusicInfo['title']} - ${currentMusicInfo['artist']}";
-                  await BLEUtils.sendMusicInfo(
-                      widget.device, formattedMusicInfo);
-                }
+                String formattedMusicInfo =
+                    "${currentMusicInfo['title']} - ${currentMusicInfo['artist']}";
+                await BLEUtils.sendMusicInfo(widget.device, formattedMusicInfo);
               },
               child: const Text('Send Music Info'),
             ),

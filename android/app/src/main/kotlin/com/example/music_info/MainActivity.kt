@@ -12,7 +12,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -28,6 +32,8 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.ble_music_info/music_info"
     private val REQUEST_BLUETOOTH_PERMISSION = 1
     private val REQUEST_LOCATION_PERMISSION = 2
+    private val PREFERENCES_NAME = "music_info_preferences"
+    private val PREFERENCE_SELECTED_APP = "selected_app"
 
     private var connectedDevice: BluetoothDevice? = null
     private var bluetoothGatt: BluetoothGatt? = null
@@ -53,6 +59,18 @@ class MainActivity : FlutterActivity() {
                 }
                 "getConnectedDevice" -> {
                     result.success(connectedDevice?.address ?: "None")
+                }
+                "getAvailablePlayers" -> {
+                    result.success(getAvailableMusicPlayers())
+                }
+                "selectPlayer" -> {
+                    val player = call.argument<String>("player")
+                    if (player != null) {
+                        saveSelectedPlayer(player)
+                        result.success(null)
+                    } else {
+                        result.error("UNAVAILABLE", "Player not available.", null)
+                    }
                 }
                 else -> result.notImplemented()
             }
@@ -122,6 +140,32 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+    }
+
+    private fun getAvailableMusicPlayers(): List<String> {
+        val musicApps = mutableListOf<String>()
+        val intent = Intent(Intent.ACTION_MAIN, null)
+        intent.addCategory(Intent.CATEGORY_APP_MUSIC)
+        val pm: PackageManager = packageManager
+        val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
+        for (app in apps) {
+            val appName = app.loadLabel(pm).toString()
+            musicApps.add(appName)
+        }
+        return musicApps
+    }
+
+    private fun saveSelectedPlayer(player: String) {
+        val prefs: SharedPreferences = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        with(prefs.edit()) {
+            putString(PREFERENCE_SELECTED_APP, player)
+            apply()
+        }
+    }
+
+    private fun getSelectedPlayer(): String? {
+        val prefs: SharedPreferences = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(PREFERENCE_SELECTED_APP, null)
     }
 
     // BLE 디바이스 연결 상태 처리
