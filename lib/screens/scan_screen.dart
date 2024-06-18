@@ -32,11 +32,12 @@ class ScanScreenState extends State<ScanScreen> {
   Future<void> _loadAvailablePlayers() async {
     try {
       List<String> players = await BLEUtils.getAvailablePlayers();
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? savedPlayer = prefs.getString('selectedPlayer');
       setState(() {
         _availablePlayers = players;
-        if (_availablePlayers.isNotEmpty) {
-          _selectedPlayer = _availablePlayers[0];
-        }
+        _selectedPlayer =
+            savedPlayer ?? (players.isNotEmpty ? players[0] : null);
       });
     } catch (e) {
       setState(() {
@@ -49,7 +50,10 @@ class ScanScreenState extends State<ScanScreen> {
     if (player != null) {
       try {
         await BLEUtils.selectPlayer(player);
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('selectedPlayer', player);
         setState(() {
+          _selectedPlayer = player;
           _errorMessage = "선택한 플레이어: $player";
         });
       } catch (e) {
@@ -213,10 +217,7 @@ class ScanScreenState extends State<ScanScreen> {
                 value: _selectedPlayer,
                 hint: const Text('음악 플레이어 선택'),
                 onChanged: (String? newValue) {
-                  setState(() {
-                    _selectedPlayer = newValue;
-                    _selectPlayer(_selectedPlayer);
-                  });
+                  _selectPlayer(newValue);
                 },
                 items: _availablePlayers
                     .map<DropdownMenuItem<String>>((String player) {

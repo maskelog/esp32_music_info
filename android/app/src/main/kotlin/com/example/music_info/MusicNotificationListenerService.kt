@@ -41,33 +41,20 @@ class MusicNotificationListenerService : NotificationListenerService() {
     private inner class MediaSessionListener : MediaSessionManager.OnActiveSessionsChangedListener {
         override fun onActiveSessionsChanged(controllers: List<MediaController>?) {
             controllers?.forEach { controller ->
-                controller.registerCallback(object : MediaController.Callback() {
-                    override fun onMetadataChanged(metadata: MediaMetadata?) {
-                        metadata?.let {
-                            val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
-                            val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-                            val newMusicInfo = "$title - $artist"
+                registerCallback(controller)
+            }
+        }
+    }
 
-                            if (musicInfo != newMusicInfo) {
-                                musicInfo = newMusicInfo
-                                println("Music Info Updated: $newMusicInfo")
-
-                                // Broadcast the music info to MainActivity
-                                val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
-                                intent.putExtra("music_info", newMusicInfo)
-                                sendBroadcast(intent)
-                            }
-                        }
-                    }
-                })
-                // Retrieve initial metadata
-                val metadata = controller.metadata
+    private fun registerCallback(controller: MediaController) {
+        controller.registerCallback(object : MediaController.Callback() {
+            override fun onMetadataChanged(metadata: MediaMetadata?) {
                 metadata?.let {
                     val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
                     val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
                     val newMusicInfo = "$title - $artist"
 
-                    if (musicInfo != newMusicInfo) {
+                    if (newMusicInfo != musicInfo) {
                         musicInfo = newMusicInfo
                         println("Music Info Updated: $newMusicInfo")
 
@@ -77,6 +64,22 @@ class MusicNotificationListenerService : NotificationListenerService() {
                         sendBroadcast(intent)
                     }
                 }
+            }
+        })
+        // Retrieve initial metadata
+        controller.metadata?.let {
+            val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
+            val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
+            val newMusicInfo = "$title - $artist"
+
+            if (newMusicInfo != musicInfo) {
+                musicInfo = newMusicInfo
+                println("Music Info Updated: $newMusicInfo")
+
+                // Broadcast the music info to MainActivity
+                val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
+                intent.putExtra("music_info", newMusicInfo)
+                sendBroadcast(intent)
             }
         }
     }

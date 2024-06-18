@@ -15,8 +15,6 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
-import android.media.session.MediaController
-import android.media.session.MediaSessionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -32,6 +30,7 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.example.ble_music_info/music_info"
     private val REQUEST_BLUETOOTH_PERMISSION = 1
     private val REQUEST_LOCATION_PERMISSION = 2
+    private val REQUEST_NOTIFICATION_PERMISSION = 3
     private val PREFERENCES_NAME = "music_info_preferences"
     private val PREFERENCE_SELECTED_APP = "selected_app"
 
@@ -44,7 +43,6 @@ class MainActivity : FlutterActivity() {
             musicInfo = intent.getStringExtra("music_info") ?: "None"
             println("Broadcast received: $musicInfo")
             sendMusicInfoToBLE(musicInfo)
-            updateUI()
         }
     }
 
@@ -82,35 +80,36 @@ class MainActivity : FlutterActivity() {
 
     private fun requestPermissions() {
         runOnUiThread {
-            // Request Bluetooth permissions
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADMIN) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            val bluetoothPermissions = arrayOf(
+                Manifest.permission.BLUETOOTH,
+                Manifest.permission.BLUETOOTH_ADMIN,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT
+            )
+            val locationPermissions = arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
 
-                ActivityCompat.requestPermissions(this, arrayOf(
-                    Manifest.permission.BLUETOOTH,
-                    Manifest.permission.BLUETOOTH_ADMIN,
-                    Manifest.permission.BLUETOOTH_SCAN,
-                    Manifest.permission.BLUETOOTH_CONNECT
-                ), REQUEST_BLUETOOTH_PERMISSION)
+            // Request Bluetooth permissions
+            if (!bluetoothPermissions.all {
+                    ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+                }) {
+                ActivityCompat.requestPermissions(this, bluetoothPermissions, REQUEST_BLUETOOTH_PERMISSION)
             }
 
             // Request Location permissions
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-
-                ActivityCompat.requestPermissions(this, arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ), REQUEST_LOCATION_PERMISSION)
+            if (!locationPermissions.all {
+                    ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+                }) {
+                ActivityCompat.requestPermissions(this, locationPermissions, REQUEST_LOCATION_PERMISSION)
             }
 
             // Request Notification Listener permissions
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 if (!isNotificationServiceEnabled()) {
                     val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    startActivity(intent)
+                    startActivityForResult(intent, REQUEST_NOTIFICATION_PERMISSION)
                 }
             }
         }
@@ -126,14 +125,14 @@ class MainActivity : FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         when (requestCode) {
             REQUEST_BLUETOOTH_PERMISSION -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                     println("Bluetooth permission granted")
                 } else {
                     println("Bluetooth permission denied")
                 }
             }
             REQUEST_LOCATION_PERMISSION -> {
-                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                     println("Location permission granted")
                 } else {
                     println("Location permission denied")
@@ -200,16 +199,10 @@ class MainActivity : FlutterActivity() {
             if (newState == BluetoothGatt.STATE_CONNECTED) {
                 println("Connected to GATT server.")
                 gatt.discoverServices()
-                runOnUiThread {
-                    updateUI()
-                }
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
                 println("Disconnected from GATT server.")
                 bluetoothGatt?.close()
                 bluetoothGatt = null
-                runOnUiThread {
-                    updateUI()
-                }
             }
         }
 
@@ -228,12 +221,6 @@ class MainActivity : FlutterActivity() {
                 println("Failed to write characteristic.")
             }
         }
-    }
-
-    private fun updateUI() {
-        val intent = Intent(this, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
-        startActivity(intent)
     }
 
     override fun onDestroy() {
