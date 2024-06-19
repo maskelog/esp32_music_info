@@ -97,12 +97,24 @@ class MusicNotificationListenerService : NotificationListenerService() {
         sendBroadcast(intent)
     }
 
-    private fun updateMusicInfoFromNotification(sbn: StatusBarNotification) {
+        private fun updateMusicInfoFromNotification(sbn: StatusBarNotification) {
+        // Filter based on package name
+        val musicPackages = listOf("com.spotify.music", "com.apple.android.music", "com.google.android.music")
+        if (sbn.packageName !in musicPackages) {
+            return
+        }
+
+        // Additional filtering can be added here if needed
         val extras = sbn.notification.extras
         val title = extras.getString("android.title") ?: "Unknown Title"
         val artist = extras.getString("android.text") ?: "Unknown Artist"
-        val newMusicInfo = "$title - $artist"
 
+        // Check if the notification contains valid music information
+        if (title == "Unknown Title" && artist == "Unknown Artist") {
+            return
+        }
+
+        val newMusicInfo = "$title - $artist"
         if (musicInfo != newMusicInfo) {
             musicInfo = newMusicInfo
             val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
