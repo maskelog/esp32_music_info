@@ -70,12 +70,34 @@ class MainActivity : FlutterActivity() {
                         result.error("UNAVAILABLE", "Player not available.", null)
                     }
                 }
+                "startMediaSessionService" -> {
+                    startMediaSessionService()
+                    result.success(null)
+                }
+                "stopMediaSessionService" -> {
+                    stopMediaSessionService()
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
 
         requestPermissions()
         registerReceiver(musicInfoReceiver, IntentFilter("com.example.ble_music_info.MUSIC_INFO"))
+    }
+
+    private fun startMediaSessionService() {
+        val intent = Intent(this, MediaSessionService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+    }
+
+    private fun stopMediaSessionService() {
+        val intent = Intent(this, MediaSessionService::class.java)
+        stopService(intent)
     }
 
     private fun requestPermissions() {

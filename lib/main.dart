@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_info/screens/scan_screen.dart';
+import 'package:music_info/services/background_service.dart'; // Import your service control file
 
 void main() {
   runApp(const MyApp());
@@ -28,11 +29,24 @@ class MyHomePage extends StatefulWidget {
 }
 
 class MyHomePageState extends State<MyHomePage> {
+  bool _isServiceRunning = false;
+
   void _navigateToScanScreen() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ScanScreen()),
     );
+  }
+
+  void _toggleService() {
+    if (_isServiceRunning) {
+      stopBackgroundService();
+    } else {
+      startBackgroundService();
+    }
+    setState(() {
+      _isServiceRunning = !_isServiceRunning;
+    });
   }
 
   @override
@@ -50,6 +64,11 @@ class MyHomePageState extends State<MyHomePage> {
             ElevatedButton(
               onPressed: _navigateToScanScreen,
               child: const Text('장치 검색'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _toggleService,
+              child: Text(_isServiceRunning ? '서비스 중지' : '서비스 시작'),
             ),
           ],
         ),
