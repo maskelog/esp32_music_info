@@ -52,7 +52,8 @@ class MusicNotificationListenerService : NotificationListenerService() {
                 metadata?.let {
                     val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
                     val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-                    val newMusicInfo = "$title - $artist"
+                    val album = it.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: "Unknown Album"
+                    val newMusicInfo = "Title: $title\nArtist: $artist\nAlbum: $album"
 
                     if (newMusicInfo != musicInfo) {
                         musicInfo = newMusicInfo
@@ -70,7 +71,8 @@ class MusicNotificationListenerService : NotificationListenerService() {
         controller.metadata?.let {
             val title = it.getString(MediaMetadata.METADATA_KEY_TITLE) ?: "Unknown Title"
             val artist = it.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: "Unknown Artist"
-            val newMusicInfo = "$title - $artist"
+            val album = it.getString(MediaMetadata.METADATA_KEY_ALBUM) ?: "Unknown Album"
+            val newMusicInfo = "Title: $title\nArtist: $artist\nAlbum: $album"
 
             if (newMusicInfo != musicInfo) {
                 musicInfo = newMusicInfo
@@ -97,24 +99,17 @@ class MusicNotificationListenerService : NotificationListenerService() {
         sendBroadcast(intent)
     }
 
-        private fun updateMusicInfoFromNotification(sbn: StatusBarNotification) {
-        // Filter based on package name
-        val musicPackages = listOf("com.spotify.music", "com.apple.android.music", "com.google.android.music")
-        if (sbn.packageName !in musicPackages) {
+    private fun updateMusicInfoFromNotification(sbn: StatusBarNotification) {
+        val packageName = sbn.packageName
+        if (packageName != "com.google.android.apps.youtube.music") {
             return
         }
 
-        // Additional filtering can be added here if needed
         val extras = sbn.notification.extras
         val title = extras.getString("android.title") ?: "Unknown Title"
         val artist = extras.getString("android.text") ?: "Unknown Artist"
-
-        // Check if the notification contains valid music information
-        if (title == "Unknown Title" && artist == "Unknown Artist") {
-            return
-        }
-
         val newMusicInfo = "$title - $artist"
+
         if (musicInfo != newMusicInfo) {
             musicInfo = newMusicInfo
             val intent = Intent("com.example.ble_music_info.MUSIC_INFO")
