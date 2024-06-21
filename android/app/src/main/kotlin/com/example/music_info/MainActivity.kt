@@ -37,12 +37,17 @@ class MainActivity : FlutterActivity() {
     private var connectedDevice: BluetoothDevice? = null
     private var bluetoothGatt: BluetoothGatt? = null
     private var musicInfo: String = "None"
+    private var previousMusicInfo: String = ""
 
     private val musicInfoReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            musicInfo = intent.getStringExtra("music_info") ?: "None"
-            println("Broadcast received: $musicInfo")
-            sendMusicInfoToBLE(musicInfo)
+            val newMusicInfo = intent.getStringExtra("music_info") ?: "None"
+            if (newMusicInfo != musicInfo) {
+                musicInfo = newMusicInfo
+                previousMusicInfo = musicInfo
+                println("Broadcast received: $musicInfo")
+                sendMusicInfoToBLE(musicInfo)
+            }
         }
     }
 
