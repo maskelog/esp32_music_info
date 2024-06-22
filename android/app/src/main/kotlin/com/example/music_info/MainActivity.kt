@@ -37,14 +37,13 @@ class MainActivity : FlutterActivity() {
     private var connectedDevice: BluetoothDevice? = null
     private var bluetoothGatt: BluetoothGatt? = null
     private var musicInfo: String = "None"
-    private var previousMusicInfo: String = ""
+    private var lastSentMusicInfo: String = ""
 
     private val musicInfoReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val newMusicInfo = intent.getStringExtra("music_info") ?: "None"
             if (newMusicInfo != musicInfo) {
                 musicInfo = newMusicInfo
-                previousMusicInfo = musicInfo
                 println("Broadcast received: $musicInfo")
                 sendMusicInfoToBLE(musicInfo)
             }
@@ -209,15 +208,30 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun sendMusicInfoToBLE(info: String) {
-        val gattService = bluetoothGatt?.getService(java.util.UUID.fromString("3db02924-b2a6-4d47-be1f-0f90ad62a048"))
-        val characteristic = gattService?.getCharacteristic(java.util.UUID.fromString("8d8218b6-97bc-4527-a8db-13094ac06b1d"))
+        if (info != lastSentMusicInfo) {
+            val gattService = bluetoothGatt?.getService(java.util.UUID.fromString("3db02924-b2a6-4d47-be1f-0f90ad62a048"))
+            val characteristic = gattService?.getCharacteristic(java.util.UUID.fromString("8d8218b6-97bc-4527-a8db-13094ac06b1d"))
 
-        if (characteristic != null) {
-            characteristic.value = info.toByteArray()
-            bluetoothGatt?.writeCharacteristic(characteristic)
-            println("BLE characteristic written: $info") // Debug log
+            if (characteristic != null) {
+                val formattedInfo = formatMusicInfo(info)
+                characteristic.value = formattedInfo.toByteArray()
+                bluetoothGatt?.writeCharacteristic(characteristic)
+                println("BLE characteristic written: $formattedInfo") // Debug log
+                lastSentMusicInfo = formattedInfo
+            } else {
+                println("Failed to find characteristic.") // Debug log
+            }
+        }
+    }
+
+    private fun formatMusicInfo(info: String): String {
+        val delimiterIndex = info.indexOf(" - ")
+        return if (delimiterIndex != -1 && delimiterIndex < info.length - 3) {
+            val artist = info.substring(0, delimiterIndex)
+            val title = info.substring(delimiterIndex + 3)
+            "$artist - $title"
         } else {
-            println("Failed to find characteristic.") // Debug log
+            info
         }
     }
 

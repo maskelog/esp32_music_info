@@ -19,33 +19,29 @@ class DeviceScreen extends StatefulWidget {
 class DeviceScreenState extends State<DeviceScreen> {
   String musicInfo = "None";
   String previousMusicInfo = "None";
+  BluetoothCharacteristic? musicCharacteristic;
 
   @override
   void initState() {
     super.initState();
     _loadMusicInfo();
     _subscribeToCharacteristic();
-    BLEUtils.monitorMusicInfo(widget.device).then((_) {
-      _getMusicInfoPeriodically();
-    });
+    _getMusicInfoPeriodically();
   }
 
   Future<void> _loadMusicInfo() async {
     try {
       final Map<String, String> result = await BLEUtils.getMusicInfo();
       String newMusicInfo = "${result['title']} - ${result['artist']}";
-      if (newMusicInfo != "Unknown - Unknown") {
+      if (newMusicInfo != musicInfo && newMusicInfo != "Unknown - Unknown") {
         if (mounted) {
           setState(() {
             musicInfo = newMusicInfo;
             previousMusicInfo = newMusicInfo;
           });
-        }
-      } else if (previousMusicInfo != "None") {
-        if (mounted) {
-          setState(() {
-            musicInfo = previousMusicInfo;
-          });
+          if (musicCharacteristic != null) {
+            await _sendMusicInfo(newMusicInfo);
+          }
         }
       }
     } catch (e) {
@@ -65,25 +61,29 @@ class DeviceScreenState extends State<DeviceScreen> {
             in service.characteristics) {
           if (characteristic.uuid.toString() ==
               '8d8218b6-97bc-4527-a8db-13094ac06b1d') {
+            musicCharacteristic = characteristic;
             await characteristic.setNotifyValue(true);
             characteristic.value.listen((value) {
               String newMusicInfo = utf8.decode(value);
-              if (newMusicInfo.contains(" - ") &&
+              if (newMusicInfo != musicInfo &&
+                  newMusicInfo.contains(" - ") &&
                   newMusicInfo != "Unknown - Unknown") {
                 setState(() {
                   musicInfo = newMusicInfo;
                   previousMusicInfo = newMusicInfo;
-                });
-              } else if (newMusicInfo == "Unknown - Unknown" &&
-                  previousMusicInfo != "None") {
-                setState(() {
-                  musicInfo = previousMusicInfo;
                 });
               }
             });
           }
         }
       }
+    }
+  }
+
+  Future<void> _sendMusicInfo(String info) async {
+    if (musicCharacteristic != null) {
+      await musicCharacteristic!.write(utf8.encode(info));
+      print("Sent music info: $info");
     }
   }
 
