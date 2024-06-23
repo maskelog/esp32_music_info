@@ -9,7 +9,7 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 32
 #define OLED_RESET -1
-#define SCROLL_DELAY 100         // 슬라이드 딜레이를 늘려 배터리 절약
+#define SCROLL_DELAY 50          // 슬라이드 딜레이를 줄여 배터리 절약
 #define INACTIVITY_TIMEOUT 30000 // 30초 동안 비활성 시 디스플레이 끔
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -21,7 +21,6 @@ BLECharacteristic musicCharacteristic("8d8218b6-97bc-4527-a8db-13094ac06b1d", BL
 String currentMusicInfo = "";
 String currentTitle = "";
 String currentArtist = "";
-String previousMusicInfo = "";
 int scrollPosition = 0;
 TaskHandle_t scrollTaskHandle;
 unsigned long lastUpdate = 0;
@@ -182,7 +181,7 @@ void scrollTextTask(void *pvParameters)
       int titleWidth = getTextWidth(currentTitle.c_str());
       if (titleWidth > SCREEN_WIDTH)
       {
-        scrollPosition--;
+        scrollPosition -= 4; // 스크롤 속도 증가
         if (scrollPosition < -titleWidth)
         {
           scrollPosition = SCREEN_WIDTH;
