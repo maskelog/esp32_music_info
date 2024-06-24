@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_info/screens/scan_screen.dart';
+import 'package:music_info/screens/device_screen.dart';
 import 'package:music_info/services/background_service.dart';
 
 void main() {
@@ -38,6 +39,13 @@ class MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  void _navigateToDeviceScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const DeviceScreen(device: /*여기에 BluetoothDevice 인스턴스를 전달하세요*/)),
+    );
+  }
+
   void _toggleService() {
     if (_isServiceRunning) {
       stopBackgroundService();
@@ -60,6 +68,11 @@ class MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text('BLE Connect'),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _navigateToDeviceScreen,
+              child: const Text('연결된 장치'),
+            ),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _navigateToScanScreen,
