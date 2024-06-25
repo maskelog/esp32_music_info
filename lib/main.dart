@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:music_info/screens/scan_screen.dart';
-import 'package:music_info/services/background_service.dart'; // Import your service control file
+import 'package:music_info/services/background_service.dart';
 
 void main() {
   runApp(const MyApp());
