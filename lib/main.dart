@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:music_info/screens/scan_screen.dart';
 import 'package:music_info/screens/device_screen.dart';
 import 'package:music_info/services/background_service.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,19 +32,36 @@ class MyHomePage extends StatefulWidget {
 
 class MyHomePageState extends State<MyHomePage> {
   bool _isServiceRunning = false;
+  BluetoothDevice? _connectedDevice;
 
   void _navigateToScanScreen() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const ScanScreen()),
+      MaterialPageRoute(
+        builder: (context) => ScanScreen(
+          onDeviceConnected: (device) {
+            setState(() {
+              _connectedDevice = device;
+            });
+          },
+        ),
+      ),
     );
   }
 
   void _navigateToDeviceScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const DeviceScreen(device: /*여기에 BluetoothDevice 인스턴스를 전달하세요*/)),
-    );
+    if (_connectedDevice != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DeviceScreen(device: _connectedDevice!),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No device selected")),
+      );
+    }
   }
 
   void _toggleService() {
@@ -70,11 +88,6 @@ class MyHomePageState extends State<MyHomePage> {
             const Text('BLE Connect'),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: _navigateToDeviceScreen,
-              child: const Text('연결된 장치'),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
               onPressed: _navigateToScanScreen,
               child: const Text('장치 검색'),
             ),
@@ -82,6 +95,11 @@ class MyHomePageState extends State<MyHomePage> {
             ElevatedButton(
               onPressed: _toggleService,
               child: Text(_isServiceRunning ? '서비스 중지' : '서비스 시작'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _navigateToDeviceScreen,
+              child: const Text('연결된 장치'),
             ),
           ],
         ),

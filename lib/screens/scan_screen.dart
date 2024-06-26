@@ -6,7 +6,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ScanScreen extends StatefulWidget {
-  const ScanScreen({super.key});
+  final void Function(BluetoothDevice device) onDeviceConnected;
+
+  const ScanScreen({required this.onDeviceConnected, super.key});
 
   @override
   ScanScreenState createState() => ScanScreenState();
@@ -161,6 +163,8 @@ class ScanScreenState extends State<ScanScreen> {
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('lastConnectedDeviceId', device.id.id);
         _connectedDevice = device;
+        widget
+            .onDeviceConnected(device); // Update connected device in main.dart
         if (mounted) {
           Navigator.of(context).push(MaterialPageRoute(
             builder: (context) => DeviceScreen(device: device),
