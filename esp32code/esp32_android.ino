@@ -45,6 +45,7 @@ void setup()
   display.clearDisplay();
   display.setTextSize(1); // 텍스트 사이즈를 줄임
   display.setTextColor(WHITE);
+  display.setContrast(50);
   Serial.println("Display initialized");
 
   // EURK 초기화
